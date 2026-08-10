@@ -1,0 +1,16 @@
+# Delaware internal material -- never publish
+ai-framework-security-blog_6.md
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Dependencies / caches
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+
+# OS
+.DS_Store
