@@ -87,6 +87,8 @@ flowchart TD
 
 All three tiers deploy to Fly.io as separate apps. Stripe webhooks enter through Tier 1; Tier 1 and Tier 2 forward the raw request body and Stripe signature unchanged to Tier 3, where signature verification happens before any processing.
 
+Secrets never live in the repository. Every provider credential exists only as a Fly.io secret on the Tier 3 app. `.env` is git-ignored, and a committed `.env.example` lists every required variable with no values — a clean clone contains no key material at all.
+
 An important nuance on the customer path: checkout and webhook traffic passes through Ops' capability scope, but it is deterministic passthrough code. No model call sits in the payment path. Ops the *agent* (an LLM loop) only acts during onboarding; Ops the *capability scope* is what the checkout passthrough runs under.
 
 ## 3. The crew
@@ -105,6 +107,13 @@ Hub-and-spoke: the Strategist coordinates three specialists. There is no agent-t
 Tier 3 rejects any requested capability not explicitly allowed for that agent. Capability authorization never replaces the required administrator or customer approval — they are checked separately.
 
 The Strategist accepts the initial prompt, generates the brand doc, and creates work for the Marketer, Web Builder, and Ops. It does not initiate deployment, video generation, or customer payment actions, and holds no credentials of any kind.
+
+The capability allow-list implies each agent's boundary, but the boundaries deserve to be stated as hard negatives:
+
+- The **Strategist** may never invoke the Action Gate for an external effect, hold a credential, or touch a provider. Delegation only.
+- The **Web Builder** may never touch Stripe or any payment code path, request a checkout or publish action, or deploy without a payload-hash-bound admin approval.
+- The **Marketer** may never send or post outside the sandbox and mail catcher, trigger a Veo render without the exact payload-and-cost approval, or make a claim not grounded in the brand document and catalog.
+- **Ops** may never request a LIVE-mode action, deploy, publish, or mark its own work verified — the gate independently confirms the persisted order row rather than trusting the agent's report.
 
 ## 4. The Action Gate
 
@@ -134,7 +143,7 @@ Every gated action is recorded with: run_id, tenant_id, agent_name, action, dest
 4. The Strategist produces the completed brief, brand identity document, and task plan. Every inference is routed by the Runtime through the Action Gate and logged against the run shell.
 5. The Strategist delegates finalization to Ops. Ops invokes the Action Gate to persist a new brand-document version with PENDING approval, set the run's brand_document_id, create the task records (initial catalog population is itself a task), and transition the run to AWAITING_BRAND_APPROVAL.
 6. The dashboard shows the completed brief and the exact versioned brand document for review. The Web Builder and Marketer remain blocked at the Action Gate while the brand document is PENDING. Administrator approval is bound to the brand-document id and content hash; the Runtime then automatically starts both downstream generators with stable, replay-safe identities.
-7. The Web Builder generates and reviews the HTML/CSS from the approved brand document. The dashboard presents it in a sandboxed preview. Only a separate payload-hash-bound admin approval may push the exact reviewed site to Cloudflare; the verified URL is returned, stored, and the task table updated.
+7. The Web Builder generates and reviews the HTML/CSS from the approved brand document. The dashboard presents it in a sandboxed preview. Only a separate payload-hash-bound admin approval may push the exact reviewed site to Cloudflare. Verification then happens in two steps, both performed by the gate rather than the agent: the URL must answer with HTTP 200, and a synthetic end-to-end purchase must succeed against the live site — a reservation created through the public checkout path and completed with Stripe's test card (headless completion of the hosted checkout, or a Stripe-CLI-triggered completed event bound to that synthetic reservation; the mechanism is a build-time decision), asserting that exactly one synthetic-flagged order row persisted. Only after both checks pass is the deployment marked verified, the URL stored, and the task table updated. A live URL whose checkout does not take money is not a deployed business.
 8. The Marketer generates the landing copy, 3–5 social posts, a launch email, and a video storyboard, stored in tenant-scoped marketing_artifacts and displayed together. Approval is bound to the complete marketing-pack hash. Only after pack approval does the dashboard expose the separate exact-payload-and-cost approval for Veo rendering — a landscape launch video plus a second Veo invocation for the vertical social cut, capped at 5 Veo generations per tenant across both outputs.
 9. Dashboard state comes from background polling against the task table.
 
@@ -177,11 +186,11 @@ Neon (Postgres) for structured data, Cloudflare R2 for binary artifacts (videos)
 
 **customers** — id, tenant_id, name, email, normalized_email (= lower(trim(email))). Unique (tenant_id, normalized_email).
 
-**reservations** — id, tenant_id, customer_id, start_date, end_date, status, total, stripe_checkout_session_id, created_at.
+**reservations** — id, tenant_id, customer_id, start_date, end_date, status, total, stripe_checkout_session_id, is_synthetic, created_at.
 
 **reservation_items** — id, reservation_id, rental_item_id, qty, day_rate.
 
-**orders** — id, created_at, tenant_id, reservation_id, stripe_checkout_session_id, amount, currency, status, payment_timestamp. reservation_id and stripe_checkout_session_id are each separately unique — the DB itself makes "one order, never two" true.
+**orders** — id, created_at, tenant_id, reservation_id, stripe_checkout_session_id, amount, currency, status, payment_timestamp, is_synthetic. reservation_id and stripe_checkout_session_id are each separately unique — the DB itself makes "one order, never two" true. is_synthetic marks the go-live verification purchase (Flow 1, step 7): excluded from business reporting, retained as go-live evidence.
 
 **webhook_events** — id, created_at, stripe_event_id (primary key). Stripe retries webhooks; this table is the dedupe.
 
@@ -215,14 +224,34 @@ Two separate problems, two separate mechanisms.
 
 ## 12. Failure catalogue
 
-1. **Tenant paid for business creation but got no deployed website.** On deploy, the gate independently verifies the deployed URL returns 200 — it never trusts the agent's self-report. A failed deploy gets one retry, then alerts the epyhia administrator; the tenant sees a message that the failure is logged and being investigated.
-2. **Marketing copy doesn't match the tenant's wishes — off-brand or inaccurate claims.** Human review of the full marketing pack, hash-bound approval, plus the Marketer's self-review and grounding check gating approval-eligibility.
-3. **Business customer gets double charged on crash or retry.** Stripe idempotency key derived from reservation id, webhook dedupe by event id, and unique constraints on reservation_id and stripe_checkout_session_id in orders.
-4. **epyhia can't control costs.** Irreversible or paid actions — publish, go-live, video generation — go through human review at the gate, bound to exact payload and cost. LLM spend is capped by the per-run budget approved up front. Customer-initiated charges are already human-approved by definition.
-5. **Fabricated social proof lands in a tenant's marketing.** The marketing prompt requires honesty and forbids invented reviews/testimonials; the grounding check must pass before anything is approval-eligible.
+Entries 1–5 and 8 are grounded in documented failures of Polsia, the real product this assignment is modeled on; 6 and 7 are specific to the rental business.
+
+1. **Tenant paid for business creation but got no deployed website.** The most-repeated complaint in Polsia's Trustpilot reviews: tasks marked "complete" by the AI that never actually deployed. On deploy, the gate independently verifies the deployed URL returns 200 — it never trusts the agent's self-report. A failed deploy gets one retry, then alerts the epyhia administrator; the tenant sees a message that the failure is logged and being investigated.
+2. **Marketing copy doesn't match the tenant's wishes — off-brand or inaccurate claims.** Polsia users reported automated outreach sent with wrong names and wrong prices. Human review of the full marketing pack, hash-bound approval, plus the Marketer's self-review and grounding check gating approval-eligibility.
+3. **Business customer gets double charged on crash or retry.** Polsia reviews describe credits burned on failed and duplicate work, and unexpected repeat charges. Stripe idempotency key derived from reservation id, webhook dedupe by event id, and unique constraints on reservation_id and stripe_checkout_session_id in orders.
+4. **epyhia can't control costs.** Polsia's founder admitted "I lose money on every customer today" — uncontrolled per-task model spend. Irreversible or paid actions — publish, go-live, video generation — go through human review at the gate, bound to exact payload and cost. LLM spend is capped by the per-run budget approved up front. Customer-initiated charges are already human-approved by definition.
+5. **Fabricated social proof lands in a tenant's marketing.** Polsia's ads agent generates UGC-style AI "testimonials" — invented endorsements published as if real. The marketing prompt requires honesty and forbids invented reviews/testimonials; the grounding check must pass before anything is approval-eligible.
 6. **Customer receives an inaccurate reservation confirmation / double booking.** Availability checked with SELECT FOR UPDATE plus date-overlap validation before booking; PENDING reservations count against availability; confirmation status is read from the DB, not the redirect.
 7. **Website descriptions or prices drift from the DB catalog.** After generation, a programmatic check compares the website against catalog descriptions and prices before deploy approval.
+8. **The site is live but the checkout is a shell.** An independent audit of Polsia's "launched" businesses found cosmetic landing pages with no sign-up, no payment integration, and no way to buy anything — while the dashboard counted them as launched. Go-live verification therefore includes the synthetic end-to-end test purchase (Flow 1, step 7): the deployment is not marked verified until exactly one synthetic-flagged order row has actually persisted through the real checkout, webhook, and DB path.
 
 ## 13. Tech stack
 
 Marketing sites: Cloudflare Pages. Backend: Node API Gateway plus Node backend workers on Fly.io. Storage: Neon (Postgres) and Cloudflare R2. Auth: Auth0. Models: OpenAI Sol 5.6 / Terra 5.6 / Luna 5.6 through the gate's /model_call. Video: Veo via kdowswell/veo-tools.
+
+This footprint is a deliberate tradeoff. Three Fly.io apps plus Cloudflare Pages, Neon, R2, Auth0, and Veo is a lot of surface for a two-week solo build, and it puts pressure on running from a clean clone. The isolation is worth it: the credential boundary is the core of the system, and with this shape a compromised or misprompted agent cannot reach a provider even in principle — the keys are in a process it cannot dial. The mitigation is operational, not architectural: one bootstrap script provisions and deploys all three apps from `.env.example`, so a clean clone still comes up with a single command.
+
+## 14. Proving it
+
+The rubric is checked by an eval the repo ships, not by claims. `eval/rubric.json` defines the criteria; `eval/eval.py` runs them against the deployed agency and writes `PRODUCT_EVAL.md`. The automated checks:
+
+- The stored live URL answers with HTTP 200 and contains the tenant's brand marker.
+- A scripted test purchase through the public checkout persists exactly one order row.
+- Every external effect has an actions row with cost populated, and run_id connects brief → tasks → agent calls → actions end to end.
+- Re-submitting the same (tenant_id, idempotency_key) returns the existing run: no second Cloudflare deployment, no duplicate order.
+- agent_calls shows the model tier split: Sol on strategy and site generation, Terra and Luna on execution.
+- Editing the brand document creates a new version and regenerates the downstream artifacts against it.
+
+The demo (60–90 seconds): a brief goes in, the brand document is approved, the deploy is approved, the live URL opens, a test card completes checkout, the order row is shown in the database, and a re-run of the same brief produces no duplicate site and no duplicate order.
+
+From a clean clone: `.env.example` documents every required variable, and one bootstrap command provisions and deploys the three Fly.io apps.
