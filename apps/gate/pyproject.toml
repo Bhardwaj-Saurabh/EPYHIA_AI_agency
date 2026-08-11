@@ -10,6 +10,9 @@ dependencies = [
     "httpx>=0.27",
     "python-dotenv>=1.0",
     "stripe>=15.5.0",
+    "pillow>=12.3.0",
+    "boto3>=1.43.69",
+    "imageio-ffmpeg>=0.6.0",
 ]
 
 [build-system]

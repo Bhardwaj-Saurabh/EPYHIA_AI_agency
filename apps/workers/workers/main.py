@@ -82,7 +82,9 @@ def post_approve_brand(run_id: str, body: dict[str, Any]) -> Any:
     approved_by = body.get("approvedBy")
     content_hash = body.get("contentHash")
     if not approved_by or not content_hash:
-        return JSONResponse(status_code=400, content={"error": "approvedBy and contentHash required"})
+        return JSONResponse(
+            status_code=400, content={"error": "approvedBy and contentHash required"}
+        )
 
     state = get_run(run_id)
     brand = state.get("brandDocument")
@@ -156,6 +158,61 @@ def post_rebuild_website(run_id: str, body: dict[str, Any]) -> Any:
 
     threading.Thread(target=_rebuild, daemon=True).start()
     return JSONResponse(status_code=202, content={"rebuilding": run_id})
+
+
+@app.post("/runs/{run_id}/render-videos")
+def post_render_videos(run_id: str, body: dict[str, Any]) -> Any:
+    """The Marketer requests the launch-video render (DESIGN.md sec. 4
+    /video-render): the payload carries the EXACT approved storyboard plus the
+    brand palette, so the admin's hash-bound approval is over what renders."""
+    import hashlib
+    import re
+
+    import httpx
+
+    tenant_id = body.get("tenantId")
+    if not tenant_id:
+        return JSONResponse(status_code=400, content={"error": "tenantId required"})
+    state = get_run(run_id)
+    brand = state.get("brandDocument")
+    pack = httpx.get(f"{GATE}/marketing-pack/{run_id}", timeout=30)
+    storyboard = next(
+        (
+            a["text_content"]
+            for a in (pack.json().get("artifacts", []) if pack.status_code == 200 else [])
+            if a["artifact_type"] == "VIDEO_STORYBOARD" and a.get("approved_by")
+        ),
+        None,
+    )
+    if not brand or not storyboard:
+        return JSONResponse(
+            status_code=409,
+            content={"error": "needs an approved brand document and an APPROVED storyboard"},
+        )
+    payload = {
+        "runId": run_id,
+        "storyboard": storyboard,
+        "businessName": state["tenant"]["business_name"],
+        "brandColors": re.findall(r"#[0-9A-Fa-f]{6}", brand["full_text"])[:6],
+        "siteUrl": (state.get("deployment") or {}).get("live_url"),
+        "contactEmail": state["tenant"].get("business_email"),
+    }
+    version = hashlib.sha256(storyboard.encode()).hexdigest()[:8]
+    result = request_action(
+        tenant_id=tenant_id,
+        run_id=run_id,
+        agent_name="marketer",
+        action_type="video_render",
+        payload=payload,
+        idempotency_key=f"video-{run_id}-{version}",
+    )
+    a = result["action"]
+    return {
+        "actionId": a["id"],
+        "status": a["status"],
+        "payloadHash": a["payload_hash"],
+        "replayed": result.get("replayed", False),
+    }
 
 
 # ---- Customer path: deterministic passthrough under Ops' capability scope.

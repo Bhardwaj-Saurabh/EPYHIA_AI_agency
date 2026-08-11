@@ -8,6 +8,7 @@ from .storage import (
     site_storage_executor,
     task_storage_executor,
 )
+from .video import video_render_executor
 
 # Executor registry. Action types without an executor are capability-checked
 # and audited but return 501 until their build-order step lands.
@@ -19,4 +20,5 @@ EXECUTORS: dict[str, Executor] = {
     "site_storage": site_storage_executor,
     "artifact_storage": artifact_storage_executor,
     "checkout_session": checkout_session_executor,
+    "video_render": video_render_executor,
 }

@@ -42,7 +42,6 @@ flowchart TD
         OpenAI["Azure OpenAI<br/>(Microsoft Foundry)"]
         CF["Cloudflare<br/>Pages"]
         Stripe["Stripe<br/>(test mode)"]
-        Veo["Veo"]
         Neon["Neon DB"]
         R2["R2"]
     end
@@ -76,7 +75,6 @@ flowchart TD
     Gate --> OpenAI
     Gate --> CF
     Gate --> Stripe
-    Gate --> Veo
     Gate --> Neon
     Gate --> R2
 ```
@@ -85,7 +83,7 @@ flowchart TD
 
 **Tier 2** holds the agent workers: the Orchestration Runtime plus Strategist, Web Builder, Marketer, and Ops. Tier 2 is reachable only from Tier 1, receives scoped capability handles, has no public ingress, and holds no credentials — not even DB credentials. Agents are independently scalable.
 
-**Tier 3** is the Action Gate. It is reachable only from Tier 2, has no public inbound, and exclusively holds the Azure OpenAI, Cloudflare, Stripe, Veo, Neon, and R2 credentials. Agents get capability handles, never keys. Even a misprompted agent cannot reach a provider directly.
+**Tier 3** is the Action Gate. It is reachable only from Tier 2, has no public inbound, and exclusively holds the Azure OpenAI, Cloudflare, Stripe, Neon, and R2 credentials. Agents get capability handles, never keys. Even a misprompted agent cannot reach a provider directly.
 
 All three tiers deploy to Fly.io as separate apps. Stripe webhooks enter through Tier 1; Tier 1 and Tier 2 forward the raw request body and Stripe signature unchanged to Tier 3, where signature verification happens before any processing.
 
@@ -114,7 +112,7 @@ The capability allow-list implies each agent's boundary, but the boundaries dese
 
 - The **Strategist** may never invoke the Action Gate for an external effect, hold a credential, or touch a provider. Delegation only.
 - The **Web Builder** may never touch Stripe or any payment code path, request a checkout or publish action, or deploy without a payload-hash-bound admin approval.
-- The **Marketer** may never send or post outside the sandbox and mail catcher, trigger a Veo render without the exact payload-and-cost approval, or make a claim not grounded in the brand document and catalog.
+- The **Marketer** may never send or post outside the sandbox and mail catcher, trigger a video render without the exact payload-hash-bound approval, or make a claim not grounded in the brand document and catalog.
 - **Ops** may never request a LIVE-mode action, deploy, publish, or mark its own work verified — the gate independently confirms the persisted order row rather than trusting the agent's report.
 
 ## 4. The Action Gate
@@ -126,7 +124,7 @@ Endpoints: `/model_call`, `/deploy`, `/checkout-session`, `/video-render`, `/pub
 - `/model_call` — all LLM inference, proxied by the Runtime for whichever agent is running, constrained by the per-run budget the administrator approved up front.
 - `/deploy` — pushes a site to Cloudflare Pages. Public, live action: requires admin approval bound to the deployment payload hash.
 - `/checkout-session` — creates Stripe Checkout sessions (test mode). Customer approval is inherent: the customer initiates and completes the checkout themselves.
-- `/video-render` — Veo generation (via kdowswell/veo-tools). Paid action: disabled until the administrator approves the exact storyboard/payload and cost.
+- `/video-render` — deterministic storyboard-to-MP4 rendering executed inside the gate (brand-styled frames composited with ffmpeg; landscape + vertical cuts stored in R2). No external video API and no per-render cost; still approval-gated so the storyboard that renders is exactly the one the administrator saw. A paid engine (e.g. Veo) can be swapped in later behind the same approval.
 - `/publish` — social/email output to sandbox and the mail catcher only.
 
 Three kinds of authorization, checked independently:

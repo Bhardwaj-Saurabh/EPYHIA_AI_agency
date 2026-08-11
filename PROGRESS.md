@@ -191,6 +191,22 @@ the specs. Update when a milestone lands or a decision is made; keep it short.
   IPv4-bound uvicorn); piping deploys to `tail` masks exit codes (set -o
   pipefail). Eval now 96/100 (agency-deployed 6/6); only launch-video (4)
   remains.
+- 2026-08-11 — **Launch video milestone — eval 100/100**: user decision
+  (DESIGN.md §4 amended): the Veo route is replaced by a deterministic
+  storyboard→MP4 renderer executed INSIDE the gate — Pillow draws
+  brand-styled frames (palette parsed from the brand doc, barn-roof motif,
+  progress dots, site-URL footer), the imageio-ffmpeg static binary
+  composites them with crossfades, boto3 uploads landscape (1920x1080) +
+  vertical (1080x1920) cuts to R2. No external video API, no per-render
+  cost; still approval-gated — the Marketer requests via workers
+  POST /runs/{id}/render-videos with the EXACT approved storyboard in the
+  payload, and the admin's hash-bound approval is what renders. The two
+  video artifact rows carry the render approver (pack approval only covers
+  text rows); MARKETING_PACK task AWAITING_VIDEO_RENDER → DONE. Verified:
+  26.5s MP4s in R2 probed playable, frames inspected on-brand with exact
+  prices. Gate image gains fonts-dejavu-core. 30 tests. eval --judge:
+  **100/100 automated points** (PRODUCT_EVAL.md regenerated). Remaining
+  for submission: the 60-90s demo recording (demo_full.py is the script).
 
 ## Blocked / owed decisions
 
