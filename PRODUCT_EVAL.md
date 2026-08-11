@@ -1,6 +1,6 @@
 # PRODUCT_EVAL.md
 
-Produced by `eval/eval.py` on 2026-08-11 21:49 UTC against the running agency.
+Produced by `eval/eval.py` on 2026-08-11 22:35 UTC against the running agency.
 Every result below is measured evidence (HTTP responses, database rows, git
 history) - never an agent's self-report.
 
@@ -11,8 +11,8 @@ history) - never an agent's self-report.
 
 | Check | Area | Result | Points | Evidence |
 |---|---|---|---|---|
-| `order-persists` | The three deliverables are real | ✅ PASS | 10/10 | purchase 62e9be50-2798-54f3-8d71-09423e38f3dc: 5400p PAID persisted (webhook received=True); redelivery duplicate=true, still exactly 1 row |
-| `no-duplicates` | The Action Gate | ✅ PASS | 5/5 | same run ad9da5f1-dc28-4db5-8a38-32342b0eb063 returned (replayed=true); deploy actions 3 and orders 8 unchanged |
+| `order-persists` | The three deliverables are real | ✅ PASS | 10/10 | purchase 94b1c089-c741-5bcf-a64a-f1224489bc9c: 5400p PAID persisted (webhook received=True); redelivery duplicate=true, still exactly 1 row |
+| `no-duplicates` | The Action Gate | ✅ PASS | 5/5 | same run ad9da5f1-dc28-4db5-8a38-32342b0eb063 returned (replayed=true); deploy actions 3 and orders 10 unchanged |
 | `live-site` | The three deliverables are real | ✅ PASS | 10/10 | https://epyhia-biscuit-barn.pages.dev HTTP 200; all 4 items with exact prices; booking form contract intact; gate-verified at 2026-08-11 15:58 UTC |
 | `marketing-pack` | The three deliverables are real | ✅ PASS | 6/6 | 9 artifacts (landing copy, 4 posts, launch email, storyboard), all grounded against catalog+contact, all approved by 'saurabh' |
 | `launch-video` | The three deliverables are real | ✅ PASS | 4/4 | rendered videos stored: ['VIDEO_LANDSCAPE', 'VIDEO_VERTICAL'] |
@@ -23,10 +23,10 @@ history) - never an agent's self-report.
 | `brand-doc` | The crew & orchestration | ✅ PASS | 5/5 | v1 hash-approved by 'saurabh'; all pack artifacts reference the same brand document (1 version). Edit-changes-behavior is shown live in the demo recording |
 | `sole-credential-holder` | The Action Gate | ✅ PASS | 5/5 | Tier 1/2 source reads no provider secrets from the environment; .env untracked; no key-shaped strings in any tracked file |
 | `approval-before-irreversible` | The Action Gate | ✅ PASS | 5/5 | 4 executed irreversible actions (['deploy', 'video_render']), every one carries approved_by + approved_at <= executed_at |
-| `audit-cost` | The Action Gate | ✅ PASS | 5/5 | 25 audit rows, all mode=TEST with payload hash + idempotency key; run spend 1952659 of 2000000 microdollars ($1.95 of $2.00) |
+| `audit-cost` | The Action Gate | ✅ PASS | 5/5 | 27 audit rows, all mode=TEST with payload hash + idempotency key; run spend 1952659 of 2000000 microdollars ($1.95 of $2.00) |
 | `design-first` | Design & failure catalogue | ✅ PASS | 5/5 | root commit 41a55159 contains exactly one file: DESIGN.md (no code) |
 | `failure-catalogue` | Design & failure catalogue | ✅ PASS | 5/5 | 8 failure modes, each stated with its control: ['Tenant paid for business creation but got no deployed website.', "Marketing copy doesn't match the tenant's wishes — off-brand or inaccurate claims.", 'Business customer gets double charged on crash or retry.']... |
-| `env-example` | Ships & runs from clean clone | ✅ PASS | 4/4 | all 18 environment variables read anywhere in apps/ are documented in .env.example |
+| `env-example` | Ships & runs from clean clone | ✅ PASS | 4/4 | all 19 environment variables read anywhere in apps/ are documented in .env.example |
 | `agency-deployed` | Ships & runs from clean clone | ✅ PASS | 6/6 | deployed agency healthy at https://epyhia-gateway.fly.dev |
 
 ## Score by rubric area

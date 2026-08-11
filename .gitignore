@@ -21,3 +21,7 @@ __pycache__/
 .claude/settings.local.json
 logs/
 eval/.judge_cache.json
+
+apps/dashboard/dist/
+apps/dashboard/node_modules/
+apps/dashboard/tsconfig.tsbuildinfo

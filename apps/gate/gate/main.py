@@ -133,6 +133,52 @@ def get_run(run_id: str) -> dict[str, Any]:
     )
 
 
+@app.get("/runs")
+def list_runs() -> dict[str, Any]:
+    """Read-only: every run with its tenant, status and derived spend
+    (feeds the admin dashboard)."""
+    with pool.connection() as conn:
+        rows = conn.execute(
+            """SELECT r.id, r.status, r.created_at, r.approved_budget_microdollars,
+                      t.business_name, t.business_slug,
+                      (COALESCE((SELECT SUM(cost_microdollars) FROM agent_calls
+                                  WHERE run_id = r.id), 0)
+                     + COALESCE((SELECT SUM(provider_cost_microdollars) FROM actions
+                                  WHERE run_id = r.id), 0))::bigint AS spent_microdollars
+                 FROM runs r JOIN tenants t ON t.id = r.tenant_id
+                ORDER BY r.created_at DESC"""
+        ).fetchall()
+    return _json({"runs": rows})
+
+
+@app.get("/runs/{run_id}/calls")
+def list_run_calls(run_id: str) -> dict[str, Any]:
+    """Read-only: the per-call model/cost ledger (README sec. 3: 'log the model
+    tier and token cost per call')."""
+    with pool.connection() as conn:
+        rows = conn.execute(
+            """SELECT agent_name, model_tier, model_id, input_tokens, output_tokens,
+                      cost_microdollars, status, started_at
+                 FROM agent_calls WHERE run_id = %s ORDER BY started_at""",
+            (run_id,),
+        ).fetchall()
+    return _json({"calls": rows})
+
+
+@app.get("/runs/{run_id}/actions")
+def list_run_actions(run_id: str) -> dict[str, Any]:
+    """Read-only: the audit trail - one row per gated action."""
+    with pool.connection() as conn:
+        rows = conn.execute(
+            """SELECT id, agent_name, action_type, payload_hash, idempotency_key, mode,
+                      approval_status, approved_by, approved_at, provider_reference,
+                      provider_cost_microdollars, status, created_at, executed_at
+                 FROM actions WHERE run_id = %s ORDER BY created_at""",
+            (run_id,),
+        ).fetchall()
+    return _json({"actions": rows})
+
+
 @app.post("/brand/{doc_id}/approve")
 def post_brand_approve(doc_id: str, body: dict[str, Any]) -> dict[str, Any]:
     """Flow 1 step 6: administrator approval bound to the brand-document id and

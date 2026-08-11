@@ -207,6 +207,18 @@ the specs. Update when a milestone lands or a decision is made; keep it short.
   prices. Gate image gains fonts-dejavu-core. 30 tests. eval --judge:
   **100/100 automated points** (PRODUCT_EVAL.md regenerated). Remaining
   for submission: the 60-90s demo recording (demo_full.py is the script).
+- 2026-08-11 — **Admin dashboard (read-only public)**: apps/dashboard —
+  React 18 + Vite + Tailwind v4, shadcn-style primitives copied in as
+  source; served as static assets by the Tier 1 gateway (multi-stage
+  Docker build via the npm workspace's hoisted root lockfile). Shows per
+  run: spend vs budget, the per-agent cost ledger (tier/model/tokens/$),
+  task statuses, pending approvals, and the full audit log with payload
+  hashes. Data flows STRICTLY down the tiers — gateway /admin/api/* →
+  workers /admin/* → gate read endpoints (new: GET /runs, /runs/{id}/calls,
+  /runs/{id}/actions) — because Tier 3 accepts no Tier 1 traffic. User
+  decision: read-only on the public deployment; approve actions appear only
+  when DASHBOARD_WRITES=on (local admin), Auth0 slots in later. JSON intro
+  moved to /api/info; browsers get the UI at /.
 
 ## Blocked / owed decisions
 

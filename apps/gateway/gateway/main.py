@@ -31,9 +31,64 @@ app.add_middleware(
 )
 
 
-@app.get("/")
-def root() -> dict[str, Any]:
-    """A human typing the bare URL should learn what this is, not see a 404."""
+# ---- Admin dashboard API: read-only proxies via Tier 2 (Tier 3 is reachable
+# only from Tier 2, DESIGN.md sec. 2). Writes (approvals) are DISABLED unless
+# DASHBOARD_WRITES=on - never set on the public deployment; the admin runs the
+# stack locally to approve. Auth0 replaces this switch later.
+
+WRITES = os.environ.get("DASHBOARD_WRITES", "").lower() == "on"
+
+
+@app.get("/admin/api/config")
+def admin_config() -> dict[str, Any]:
+    return {"writesEnabled": WRITES}
+
+
+@app.get("/admin/api/{path:path}")
+def admin_read(path: str) -> Any:
+    allowed = path == "runs" or path == "approvals" or (
+        path.startswith("runs/") and path.count("/") <= 2
+    )
+    if not allowed:
+        return JSONResponse(status_code=404, content={"error": "unknown admin view"})
+    res = httpx.get(f"{WORKERS}/admin/{path}", timeout=30)
+    return JSONResponse(status_code=res.status_code, content=res.json())
+
+
+@app.post("/admin/api/approvals/{action_id}/approve")
+def admin_approve(action_id: str, body: dict[str, Any]) -> Any:
+    if not WRITES:
+        return JSONResponse(
+            status_code=403,
+            content={"error": "approvals are disabled on the public deployment - "
+                     "run the dashboard locally to approve"},
+        )
+    res = httpx.post(f"{WORKERS}/admin/approvals/{action_id}/approve", json=body, timeout=600)
+    return JSONResponse(status_code=res.status_code, content=res.json())
+
+
+# The admin dashboard (React build) is served here when present - the browser
+# gets a UI at "/", API callers keep JSON at /api/info.
+DASHBOARD_DIST = REPO_ROOT / "apps" / "dashboard" / "dist"
+if DASHBOARD_DIST.is_dir():
+    from fastapi.responses import FileResponse
+    from fastapi.staticfiles import StaticFiles
+
+    app.mount("/assets", StaticFiles(directory=DASHBOARD_DIST / "assets"), name="assets")
+
+    @app.get("/")
+    def dashboard_index() -> Any:
+        return FileResponse(DASHBOARD_DIST / "index.html")
+else:
+
+    @app.get("/")
+    def root_fallback() -> dict[str, Any]:
+        return api_info()
+
+
+@app.get("/api/info")
+def api_info() -> dict[str, Any]:
+    """A human or script asking what this is should learn, not see a 404."""
     return {
         "service": "EPYHIA — a one-person AI agency (Assignment 4, FDE track)",
         "thisApp": "Tier 1 public API gateway (no credentials). Tier 2 agents and the "

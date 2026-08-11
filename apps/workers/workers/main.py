@@ -215,6 +215,42 @@ def post_render_videos(run_id: str, body: dict[str, Any]) -> Any:
     }
 
 
+# ---- Admin dashboard passthrough: Tier 1 may not reach Tier 3 directly
+# (DESIGN.md sec. 2), so read views and approvals flow through here unchanged.
+
+
+@app.get("/admin/{path:path}")
+def admin_read(path: str) -> Any:
+    import httpx
+
+    gate_paths = {"runs": "/runs", "approvals": "/approvals"}
+    if path in gate_paths:
+        target = gate_paths[path]
+    elif path.startswith("runs/"):
+        parts = path.split("/")
+        views = {"state": "", "calls": "/calls", "actions": "/actions"}
+        if len(parts) == 2:
+            target = f"/runs/{parts[1]}"
+        elif len(parts) == 3 and parts[2] in views:
+            target = f"/runs/{parts[1]}{views[parts[2]]}"
+        elif len(parts) == 3 and parts[2] == "pack":
+            target = f"/marketing-pack/{parts[1]}"
+        else:
+            return JSONResponse(status_code=404, content={"error": "unknown admin view"})
+    else:
+        return JSONResponse(status_code=404, content={"error": "unknown admin view"})
+    res = httpx.get(f"{GATE}{target}", timeout=30)
+    return JSONResponse(status_code=res.status_code, content=res.json())
+
+
+@app.post("/admin/approvals/{action_id}/approve")
+def admin_approve(action_id: str, body: dict[str, Any]) -> Any:
+    import httpx
+
+    res = httpx.post(f"{GATE}/approvals/{action_id}/approve", json=body, timeout=600)
+    return JSONResponse(status_code=res.status_code, content=res.json())
+
+
 # ---- Customer path: deterministic passthrough under Ops' capability scope.
 # No model call sits anywhere in the payment path (DESIGN.md sec. 2).
 
