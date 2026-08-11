@@ -185,6 +185,89 @@ def get_tenant_by_slug(slug: str) -> dict[str, Any]:
     return _json({"tenant": tenant})
 
 
+def _pack_rows(run_id: str) -> list[dict[str, Any]]:
+    with pool.connection() as conn:
+        return conn.execute(
+            """SELECT id, artifact_type, sequence_number, channel, text_content,
+                      self_review_status, grounding_check_status, review_feedback,
+                      approval_status, approved_by, approved_at, brand_document_id
+                 FROM marketing_artifacts
+                WHERE run_id = %s AND text_content IS NOT NULL
+                ORDER BY artifact_type, sequence_number""",
+            (run_id,),
+        ).fetchall()
+
+
+def _pack_hash(rows: list[dict[str, Any]]) -> str:
+    from .hashing import payload_hash
+
+    return payload_hash(
+        [
+            {
+                "type": r["artifact_type"],
+                "seq": r["sequence_number"],
+                "channel": r["channel"],
+                "text": r["text_content"],
+            }
+            for r in rows
+        ]
+    )
+
+
+@app.get("/marketing-pack/{run_id}")
+def get_marketing_pack(run_id: str) -> dict[str, Any]:
+    """The pack the administrator reviews, with the authoritative hash their
+    approval binds to (DESIGN.md sec. 5.8)."""
+    rows = _pack_rows(run_id)
+    if not rows:
+        raise GateError(404, "no marketing artifacts for this run")
+    eligible = all(
+        r["self_review_status"] == "PASSED" and r["grounding_check_status"] == "PASSED"
+        for r in rows
+    )
+    return _json({"artifacts": rows, "packHash": _pack_hash(rows), "approvalEligible": eligible})
+
+
+@app.post("/marketing-pack/{run_id}/approve")
+def post_marketing_pack_approve(run_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    """Approval bound to the complete marketing-pack hash. Only packs whose
+    artifacts all passed self-review AND grounding are approval-eligible."""
+    approved_by = body.get("approvedBy")
+    pack_hash = body.get("packHash")
+    if not approved_by or not pack_hash:
+        raise GateError(400, "approvedBy and packHash required")
+
+    rows = _pack_rows(run_id)
+    if not rows:
+        raise GateError(404, "no marketing artifacts for this run")
+    if any(
+        r["self_review_status"] != "PASSED" or r["grounding_check_status"] != "PASSED"
+        for r in rows
+    ):
+        raise GateError(409, "pack is not approval-eligible: self-review or grounding not passed")
+    if _pack_hash(rows) != pack_hash:
+        raise GateError(
+            409, "approval hash does not match the current pack - it was superseded; re-review it"
+        )
+
+    with pool.connection() as conn:
+        conn.execute(
+            """UPDATE marketing_artifacts
+                  SET approval_status = 'APPROVED', approved_by = %s, approved_at = now(),
+                      updated_at = now()
+                WHERE run_id = %s AND text_content IS NOT NULL""",
+            (approved_by, run_id),
+        )
+        # Honest task state: the pack is approved, but the marketing deliverable
+        # is only COMPLETE once the videos render (a separate paid approval).
+        conn.execute(
+            """UPDATE tasks SET status = 'AWAITING_VIDEO_RENDER', updated_at = now()
+                WHERE run_id = %s AND task_type = 'MARKETING_PACK'""",
+            (run_id,),
+        )
+    return _json({"approved": True, "artifacts": len(rows), "packHash": pack_hash})
+
+
 @app.get("/health/live")
 def health_live() -> dict[str, str]:
     return {"status": "ok", "app": "gate"}

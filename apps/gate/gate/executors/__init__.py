@@ -1,6 +1,7 @@
 from ..pipeline import Executor
 from .deploy import deploy_executor
 from .storage import (
+    artifact_storage_executor,
     business_storage_executor,
     run_shell_executor,
     site_storage_executor,
@@ -15,4 +16,5 @@ EXECUTORS: dict[str, Executor] = {
     "business_storage": business_storage_executor,
     "task_storage": task_storage_executor,
     "site_storage": site_storage_executor,
+    "artifact_storage": artifact_storage_executor,
 }

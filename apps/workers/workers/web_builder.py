@@ -11,6 +11,7 @@ It never deploys directly and never touches payment code.
 
 import json
 import logging
+import uuid
 from typing import Any
 
 from .checks import check_site, format_rate_gbp
@@ -60,13 +61,15 @@ Respond ONLY with JSON: {"approved": boolean, "feedback": string}"""
 
 
 def _update_task(tenant_id: str, run_id: str, task_type: str, status: str) -> None:
+    # Attempt-scoped key: task transitions are internal bookkeeping and each
+    # attempt (including retries after failure) should land and be audited.
     request_action(
         tenant_id=tenant_id,
         run_id=run_id,
         agent_name="system",
         action_type="task_storage",
         payload={"op": "update", "runId": run_id, "taskType": task_type, "status": status},
-        idempotency_key=f"task-{run_id}-{task_type}-{status}",
+        idempotency_key=f"task-{run_id}-{task_type}-{status}-{uuid.uuid4().hex[:8]}",
     )
 
 

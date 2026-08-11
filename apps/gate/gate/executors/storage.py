@@ -214,6 +214,58 @@ def _finalize_run(p: dict[str, Any], tenant_id: str) -> ExecutorResult:
         return ExecutorResult(provider_reference=str(doc_id))
 
 
+TEXT_ARTIFACT_TYPES = frozenset({"LANDING_COPY", "SOCIAL_POST", "LAUNCH_EMAIL", "VIDEO_STORYBOARD"})
+
+
+def artifact_storage_executor(payload: Any, ctx: ExecutorContext) -> ExecutorResult:
+    """Marketer's artifact storage: persists the reviewed marketing pack.
+    Each artifact records its self-review and grounding status - only a pack
+    whose artifacts all passed becomes approval-eligible (DESIGN.md sec. 5.8)."""
+    p = payload if isinstance(payload, dict) else {}
+    run_id = p.get("runId")
+    brand_document_id = p.get("brandDocumentId")
+    artifacts = p.get("artifacts")
+    if not run_id or not brand_document_id or not isinstance(artifacts, list) or not artifacts:
+        raise ValueError("artifact_storage needs runId, brandDocumentId, artifacts")
+
+    with pool.connection() as conn, conn.cursor() as cur:
+        for a in artifacts:
+            a_type = a.get("type")
+            if a_type not in TEXT_ARTIFACT_TYPES:
+                raise ValueError(f"unsupported artifact type '{a_type}' for text storage")
+            if not a.get("text"):
+                raise ValueError(f"artifact {a_type} has empty text")
+            cur.execute(
+                """INSERT INTO marketing_artifacts
+                     (tenant_id, run_id, brand_document_id, artifact_type, sequence_number,
+                      channel, text_content, self_review_status, grounding_check_status,
+                      review_feedback, approval_status)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'PENDING')
+                   ON CONFLICT (run_id, artifact_type, sequence_number) DO UPDATE
+                     SET text_content = EXCLUDED.text_content,
+                         channel = EXCLUDED.channel,
+                         brand_document_id = EXCLUDED.brand_document_id,
+                         self_review_status = EXCLUDED.self_review_status,
+                         grounding_check_status = EXCLUDED.grounding_check_status,
+                         review_feedback = EXCLUDED.review_feedback,
+                         approval_status = 'PENDING',
+                         updated_at = now()""",
+                (
+                    ctx.tenant_id,
+                    run_id,
+                    brand_document_id,
+                    a_type,
+                    a.get("sequenceNumber", 1),
+                    a.get("channel"),
+                    a["text"],
+                    a.get("selfReviewStatus", "PENDING"),
+                    a.get("groundingCheckStatus", "PENDING"),
+                    a.get("reviewFeedback"),
+                ),
+            )
+    return ExecutorResult(provider_reference=f"pack:{run_id}:{len(artifacts)} artifacts")
+
+
 def _record_questions(p: dict[str, Any], tenant_id: str) -> ExecutorResult:
     run_id = p.get("runId")
     questions = p.get("questions")

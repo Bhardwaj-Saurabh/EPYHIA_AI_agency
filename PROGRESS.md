@@ -5,11 +5,12 @@ the specs. Update when a milestone lands or a decision is made; keep it short.
 
 ## Where we are
 
-- **Phase:** Web Builder milestone DONE (README.md §6, item 4) — the week-1
-  pipeline is complete: brief → brand doc → approval → catalog → site → gated
-  deploy → verified live URL. Next: week 2 — the Marketer (item 6) and the
-  admin dashboard (React SPA on Tier 1, needed for real approval UX), then
-  Ops/checkout (item 7).
+- **Phase:** Marketer milestone DONE (README.md §6, item 6) — text pack +
+  storyboard approved, hash-bound. MARKETING_PACK sits at
+  AWAITING_VIDEO_RENDER by design: Veo renders are a separate paid approval
+  and GOOGLE_AI_API_KEY is still empty. Next: Ops/checkout (item 7 — the
+  decisive rubric rows), then the admin dashboard (React SPA on Tier 1),
+  video render when the key lands, Fly deploy of the agency, eval/.
 - **How to run:** `uv sync --all-packages` + `npm install` (wrangler), then
   `uv run python -m gate.main` / `-m workers.main` / `-m gateway.main`.
   Health: `GET :8082|:8081|:8080/health/live` and `/health/ready`.
@@ -72,6 +73,19 @@ the specs. Update when a milestone lands or a decision is made; keep it short.
   Lesson logged: first attempt burned 3 Sol rounds because the reviewer had no
   calibration and regeneration started from scratch — fixed by revise-not-
   regenerate + reject-only-for-nameable-violations prompt (1 round after fix).
+- 2026-08-11 — **Marketer milestone**: content pack on Terra (landing copy,
+  4 channel-appropriate posts, launch email, 6-8 shot video storyboard), each
+  artifact passing a deterministic grounding check (only catalog prices, only
+  the real email, fabrication tripwires incl. delivery) AND a self-review
+  before storage; pack approval bound to the complete pack hash at the gate
+  (tamper test: wrong hash → 409). 7 artifacts approved; MARKETING_PACK →
+  AWAITING_VIDEO_RENDER (honest: Veo is a separate paid approval, key not yet
+  provided). Run spend: $1.12 of $2.00. Lessons: the self-review caught a real
+  fabrication my own prompt had planted ("announcing to people who asked to be
+  told" → invented subscriber relationship), and two false-positive rounds
+  came from context asymmetry — the reviewer must receive the same ground
+  truth (brief, live URL) as the generator. Also: task-status transitions now
+  use attempt-scoped idempotency keys so retries re-mark status.
 
 ## Blocked / owed decisions
 

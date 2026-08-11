@@ -10,6 +10,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from .gate_client import GateClientError, approve_brand, get_run, request_action
+from .marketer import build_marketing_pack
 from .ops_agent import setup_catalog
 from .strategist import run_strategist
 from .web_builder import build_website
@@ -106,6 +107,11 @@ def _downstream_bg(tenant_id: str, run_id: str) -> None:
         if tasks.get("WEBSITE") in ("PENDING", "IN_PROGRESS", "FAILED"):
             outcome = build_website(tenant_id, run_id)
             log.info("web builder done for run %s: %s", run_id, outcome)
+        state = get_run(run_id)
+        tasks = {t["task_type"]: t["status"] for t in state["tasks"]}
+        if tasks.get("MARKETING_PACK") in ("PENDING", "IN_PROGRESS", "FAILED"):
+            outcome = build_marketing_pack(tenant_id, run_id)
+            log.info("marketer done for run %s: %s", run_id, outcome)
     except Exception:
         log.exception("downstream pipeline failed for run %s", run_id)
 

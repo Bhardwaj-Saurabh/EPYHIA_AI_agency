@@ -7,7 +7,7 @@ checked separately in the pipeline.
 CAPABILITIES: dict[str, tuple[str, ...]] = {
     "strategist": ("model_call",),
     "web_builder": ("model_call", "deploy", "site_storage"),
-    "marketer": ("model_call", "video_render", "publish"),
+    "marketer": ("model_call", "video_render", "publish", "artifact_storage"),
     "ops": ("model_call", "checkout_session", "business_storage"),
     # Deterministic control-plane code: run-shell creation (Flow 1 step 2) and
     # task bookkeeping by the Orchestration Runtime.

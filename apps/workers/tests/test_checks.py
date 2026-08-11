@@ -46,3 +46,43 @@ def test_filler_and_viewport_flagged():
     problems = check_site(html, [], None)
     assert any("lorem ipsum" in p for p in problems)
     assert any("viewport" in p for p in problems)
+
+
+def test_marketing_true_prices_pass():
+    from workers.checks import check_marketing_text
+
+    text = "Chairs from £1.50/day and marquee tents at £140/day. hello@brightsideparty.example"
+    assert check_marketing_text(text, CATALOG, "hello@brightsideparty.example") == []
+
+
+def test_marketing_invented_price_flagged():
+    from workers.checks import check_marketing_text
+
+    text = "Tents from just £99/day!"
+    problems = check_marketing_text(text, CATALOG, None)
+    assert any("£99" in p and "not a catalog rate" in p for p in problems)
+
+
+def test_marketing_fabrications_flagged():
+    from workers.checks import check_marketing_text
+
+    text = "20% off this week! Free delivery. Rated 5-star by our happy customers."
+    problems = check_marketing_text(text, CATALOG, None)
+    assert any("discount" in p for p in problems)
+    assert any("delivery" in p for p in problems)
+    assert any("star" in p for p in problems)
+
+
+def test_marketing_wrong_email_flagged():
+    from workers.checks import check_marketing_text
+
+    text = "Contact us at info@wrongdomain.com"
+    problems = check_marketing_text(text, CATALOG, "hello@brightsideparty.example")
+    assert any("unknown email" in p for p in problems)
+
+
+def test_marketing_email_at_sentence_end_passes():
+    from workers.checks import check_marketing_text
+
+    text = "Questions? Write to hello@brightsideparty.example. We reply fast."
+    assert check_marketing_text(text, CATALOG, "hello@brightsideparty.example") == []

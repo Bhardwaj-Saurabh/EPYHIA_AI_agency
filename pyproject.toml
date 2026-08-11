@@ -21,6 +21,7 @@ select = ["E", "F", "I", "UP", "B"]
 "**/main.py" = ["E501"]
 "**/models_ai.py" = ["E501"]
 "**/web_builder.py" = ["E501"]
+"**/marketer.py" = ["E501"]
 "**/executors/storage.py" = ["E501"]
 
 [tool.pytest.ini_options]
