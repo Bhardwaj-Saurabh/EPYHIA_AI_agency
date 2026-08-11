@@ -31,6 +31,29 @@ app.add_middleware(
 )
 
 
+@app.get("/")
+def root() -> dict[str, Any]:
+    """A human typing the bare URL should learn what this is, not see a 404."""
+    return {
+        "service": "EPYHIA — a one-person AI agency (Assignment 4, FDE track)",
+        "thisApp": "Tier 1 public API gateway (no credentials). Tier 2 agents and the "
+        "Tier 3 Action Gate are private - no public inbound.",
+        "demoBusiness": {
+            "name": "The Biscuit Barn (pet boarding, Harrogate)",
+            "liveSite": "https://epyhia-biscuit-barn.pages.dev",
+            "note": "book a stay with Stripe test card 4242 4242 4242 4242 - "
+            "the order persists to a real database via webhook",
+        },
+        "endpoints": {
+            "POST /api/checkout": "booking form -> server-priced Stripe test session",
+            "POST /webhooks/stripe": "raw signature-verified webhook intake",
+            "GET /api/reservations/{id}": "reservation + order status from the DB",
+            "GET /health/live | /health/ready": "health",
+        },
+        "source": "https://github.com/Bhardwaj-Saurabh/EPYHIA_AI_agency",
+    }
+
+
 @app.post("/api/checkout")
 def post_checkout(body: dict[str, Any]) -> Any:
     """The generated site's booking form posts here. The browser supplies item
