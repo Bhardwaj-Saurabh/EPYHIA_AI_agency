@@ -25,6 +25,7 @@ AGENT_TIER: dict[str, Tier] = {
     "web_builder": "sol",
     "marketer": "terra",
     "ops": "luna",
+    "evaluator": "luna",
 }
 
 _TIER_ORDER: list[Tier] = ["luna", "terra", "sol"]

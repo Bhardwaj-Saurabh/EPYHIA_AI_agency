@@ -12,6 +12,9 @@ CAPABILITIES: dict[str, tuple[str, ...]] = {
     # Deterministic control-plane code: run-shell creation (Flow 1 step 2) and
     # task bookkeeping by the Orchestration Runtime.
     "system": ("run_shell", "task_storage"),
+    # The eval suite's LLM judge (DESIGN.md sec. 14): inference only, cheapest
+    # tier, routed through the gate like every other call so it is cost-logged.
+    "evaluator": ("model_call",),
 }
 
 # Actions a human must approve before they execute, bound to the exact payload

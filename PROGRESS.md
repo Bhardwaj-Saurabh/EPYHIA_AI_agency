@@ -147,6 +147,21 @@ the specs. Update when a milestone lands or a decision is made; keep it short.
   with the HTML and the longer styled page truncated — so the Sol cap went
   20k → 28k. Run spend: $1.95 of $2.00 (budget nearly exhausted; future
   design tweaks should go in a fresh run with its own budget).
+- 2026-08-11 — **eval/ milestone (the submission artifact)**: rubric.json
+  mirrors README §7's 100 points across 17 checks; eval.py runs them against
+  the live agency + Neon and writes PRODUCT_EVAL.md. Decisive checks first
+  and both PASS: a scripted purchase through the public chain persisted
+  exactly one PAID order (redelivery = duplicate no-op), and replaying the
+  original brief returned the same run with zero new deploys/orders. LLM
+  brand-voice judge (--judge) routes through the gate's /model_call as a new
+  'evaluator' capability (luna, cost-logged, cached by content hash) — scored
+  9/10 for 638 µ$. Current honest score: 92/100 automated — the 8 missing
+  points are launch-video (0/4, no render key) and agency-deployed (2/6
+  partial, Fly pending). First eval run also caught a real semantic:
+  billing is INCLUSIVE of the collection day ((end-start).days + 1); and the
+  credential scan exempts demo_*.py because demos play the role of Stripe
+  (they sign synthetic webhook events). Usage: `uv run python eval/eval.py
+  [--judge] [--only <check>]`.
 
 ## Blocked / owed decisions
 

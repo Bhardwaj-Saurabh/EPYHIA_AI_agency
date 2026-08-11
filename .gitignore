@@ -20,3 +20,4 @@ __pycache__/
 # Local-only Claude Code state
 .claude/settings.local.json
 logs/
+eval/.judge_cache.json

@@ -1,0 +1,125 @@
+{
+  "source": "README.md section 7 - Grading (100 pts)",
+  "target": "the running epyhia agency (local or deployed) and its Neon database",
+  "criteria": [
+    {
+      "id": "live-site",
+      "area": "The three deliverables are real",
+      "points": 10,
+      "requirement": "A live website on a real URL, on-brand, that someone else can open",
+      "evidence": "GET the deployed URL (cache-busted): HTTP 200; every catalog item and exact price on the page; booking-form contract present; contact email present; deployment row verified_at set"
+    },
+    {
+      "id": "order-persists",
+      "area": "The three deliverables are real",
+      "points": 10,
+      "requirement": "DECISIVE: a completed test purchase fires a webhook and writes exactly one order row to a real DB",
+      "evidence": "eval performs a scripted purchase through the public chain (gateway -> workers -> gate): reservation created, Stripe test session, signed webhook, then asserts exactly one PAID order row with the server-computed amount; a redelivered webhook is a duplicate no-op and the row count stays 1"
+    },
+    {
+      "id": "marketing-pack",
+      "area": "The three deliverables are real",
+      "points": 6,
+      "requirement": "Landing copy + 3-5 social posts + a launch email in a consistent brand voice, factually grounded",
+      "evidence": "marketing_artifacts rows: LANDING_COPY, >=3 SOCIAL_POST, LAUNCH_EMAIL, VIDEO_STORYBOARD; every text artifact re-passes the deterministic grounding check (real prices, real email, no fabrications); pack hash-approved (approved_by set)"
+    },
+    {
+      "id": "launch-video",
+      "area": "The three deliverables are real",
+      "points": 4,
+      "requirement": "A short launch video with a vertical social cut",
+      "evidence": "VIDEO_LANDSCAPE and VIDEO_VERTICAL artifact rows with a stored object (r2_object_key + mime_type)"
+    },
+    {
+      "id": "not-slop",
+      "area": "Not slop",
+      "points": 8,
+      "requirement": "The site reads like a real brand's, not an AI template (deterministic half)",
+      "evidence": "live HTML: no filler markers, no fabrication tripwires (stars/testimonials/discounts/guarantees), a real design system (:root custom properties, fluid type, gradient/tint work, motion behind prefers-reduced-motion), substantial inline CSS"
+    },
+    {
+      "id": "brand-voice-judge",
+      "area": "Not slop",
+      "points": 7,
+      "requirement": "On-brand voice and non-generic feel (LLM-judge half, runs with --judge)",
+      "evidence": "a cheapest-tier judge, called through the gate's /model_call (cost-logged like any inference), scores the live page against the approved brand document; pass at score >= 7/10; prompt and rationale recorded; cached by content hash so unchanged pages are not re-judged"
+    },
+    {
+      "id": "tier-split-cost",
+      "area": "The crew & orchestration",
+      "points": 5,
+      "requirement": "Cheaper models did the drafting; model tier and token cost logged per call",
+      "evidence": "agent_calls for the run: every completed call has tokens and cost_microdollars > 0; each agent ran at its entitled tier or cheaper (strategist/web_builder<=sol, marketer<=terra, ops/evaluator<=luna); at least two distinct tiers actually used"
+    },
+    {
+      "id": "strategist-delegates",
+      "area": "The crew & orchestration",
+      "points": 5,
+      "requirement": "The Strategist reasons and delegates; it makes zero external calls itself",
+      "evidence": "zero rows in actions with agent_name='strategist' - its only footprint is /model_call; all persistence and side effects were requested by system/ops/web_builder/marketer"
+    },
+    {
+      "id": "brand-doc",
+      "area": "The crew & orchestration",
+      "points": 5,
+      "requirement": "A versioned brand doc is the shared memory and changes behavior when edited",
+      "evidence": "brand_document: versioned per tenant, content_hash set, hash-bound approval recorded; generated artifacts reference the same brand_document_id (the behavior-change on edit is demonstrated in the recording - noted, not faked)"
+    },
+    {
+      "id": "sole-credential-holder",
+      "area": "The Action Gate",
+      "points": 5,
+      "requirement": "The gate is the only holder of credentials; single door for spend/publish",
+      "evidence": "static scan: Tier 1/Tier 2 source reads no provider secrets (no STRIPE_/AZURE_/DATABASE_URL/CLOUDFLARE_/R2_ env access outside apps/gate); .env is not tracked by git; no key-shaped strings in tracked files"
+    },
+    {
+      "id": "approval-before-irreversible",
+      "area": "The Action Gate",
+      "points": 5,
+      "requirement": "Human approval before anything irreversible (go-live, paid renders, publish)",
+      "evidence": "every executed action of an approval-required type has approved_by and approved_at <= executed_at; zero approval-required actions executed unapproved"
+    },
+    {
+      "id": "no-duplicates",
+      "area": "The Action Gate",
+      "points": 5,
+      "requirement": "DECISIVE: a re-run produces no duplicate site or charge",
+      "evidence": "eval re-submits the exact original brief with the original idempotency key: same run id returned, replayed=true, zero new deploy actions, zero new orders; plus the webhook redelivery no-op from order-persists"
+    },
+    {
+      "id": "audit-cost",
+      "area": "The Action Gate",
+      "points": 5,
+      "requirement": "One audit row + cost per call; test-mode by default; traceable by run id",
+      "evidence": "every action row carries payload_hash, idempotency_key, status and mode='TEST'; executed external actions carry a provider_reference; total run spend (agent_calls + actions) is within the admin-approved budget"
+    },
+    {
+      "id": "design-first",
+      "area": "Design & failure catalogue",
+      "points": 5,
+      "requirement": "DESIGN.md is the first commit and contains no code",
+      "evidence": "git log --reverse: the root commit touches exactly one file, DESIGN.md"
+    },
+    {
+      "id": "failure-catalogue",
+      "area": "Design & failure catalogue",
+      "points": 5,
+      "requirement": "At least 5 real failure modes, each with a control",
+      "evidence": "DESIGN.md section 12 parses to >= 5 numbered entries, each naming a failure and a control"
+    },
+    {
+      "id": "env-example",
+      "area": "Ships & runs from clean clone",
+      "points": 4,
+      "requirement": ".env.example documents every required variable; secrets only from env",
+      "evidence": "every environment variable read anywhere in apps/ appears in .env.example; .env.example contains placeholders only"
+    },
+    {
+      "id": "agency-deployed",
+      "area": "Ships & runs from clean clone",
+      "points": 6,
+      "requirement": "The agency itself is deployed (real URL); one command up",
+      "evidence": "if EVAL_AGENCY_URL is set: its /health/ready answers ok. Otherwise partial credit for all three local services healthy (deploy pending)"
+    }
+  ]
+}
