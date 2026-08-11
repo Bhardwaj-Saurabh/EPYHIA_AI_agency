@@ -66,11 +66,11 @@ def test_marketing_invented_price_flagged():
 def test_marketing_fabrications_flagged():
     from workers.checks import check_marketing_text
 
-    text = "20% off this week! Free delivery. Rated 5-star by our happy customers."
+    text = "20% off this week! Rated 5-star by our happy customers, money-back guarantee."
     problems = check_marketing_text(text, CATALOG, None)
     assert any("discount" in p for p in problems)
-    assert any("delivery" in p for p in problems)
     assert any("star" in p for p in problems)
+    assert any("guarantee" in p for p in problems)
 
 
 def test_marketing_wrong_email_flagged():

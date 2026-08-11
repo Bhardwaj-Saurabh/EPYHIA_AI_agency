@@ -4,11 +4,13 @@ epyhia generates a specific type of business infrastructure and marketing from a
 
 ## 1. The sample business
 
-**Party Rentals** — a local party rentals business for residential and small-business events. It rents tables, chairs, tents, generators, and audio systems. Rentals are for specific quantities of items over a fixed term.
+**Pet Boarding** — a local kennels and cattery for owners who travel. It offers boarding spaces (standard and large kennels, cattery pods) and daycare day-passes. Bookings are for specific quantities of spaces over a fixed term.
 
-Charging model: pay in full at booking. For each item, `qty × day_rate × rental_days`, summed across the reservation. All money is handled in integer cents to avoid floating-point math.
+Charging model: pay in full at booking. For each space type, `qty × day_rate × rental_days`, summed across the reservation. All money is handled in integer cents to avoid floating-point math.
 
-Out of scope for the business: late fees, customer alerts or reminders, backend delivery scheduling, worker tracking, and security deposits.
+Out of scope for the business: vaccination-record verification, pet transport, late fees, customer alerts or reminders, staff scheduling, and security deposits.
+
+(The commerce shape — quantities of bookable capacity over a date range, paid in full — is what the system is built against; the sample business is swappable by brief. Amended 2026-08-11 from the original party-rentals sample; the schema keeps its generic hire-shaped table names.)
 
 Safety defaults for the whole system: Stripe always uses test-mode keys. Email goes only to a configured mail catcher. Social publishing produces drafts or sandbox records, never real posts. All actions default to TEST and the gate rejects unsupported LIVE actions.
 
@@ -149,7 +151,7 @@ Every gated action is recorded with: run_id, tenant_id, agent_name, action, dest
 
 **Request changes** is offered at every review, with required administrator feedback. A brand or business-fact change creates a new strategy run and brand-document version, then regenerates both downstream deliverables after brand approval. Website-only or marketing-only feedback creates a separate traceable revision run that reuses the approved brand and catalog and regenerates only that artifact. Prior versions stay immutable.
 
-## 6. Flow 2 — Customer checkout (party rentals)
+## 6. Flow 2 — Customer checkout (pet boarding)
 
 1. The customer selects one or more items on the public site and checks out. The browser sends only item IDs, quantities, rental dates, and customer details — never an authoritative price, total, currency, or tenant ID. Tenant identity comes from the site/host mapping or authenticated context.
 2. The backend loads or inserts the customer row by normalized email, checks availability, and inserts a reservation with PENDING status. PENDING reservations count against availability. Availability checks use SELECT FOR UPDATE on quantities and validate date overlaps, so double-booking is prevented at the database, not by hope.

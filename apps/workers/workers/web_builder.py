@@ -23,15 +23,16 @@ log = logging.getLogger("workers.web_builder")
 MAX_ROUNDS = 3
 
 GENERATE_PROMPT = """You are the Web Builder of EPYHIA. Build a single-page,
-high-converting landing page for a local rentals business - NOT a generic
-corporate template.
+high-converting landing page for a local booking-based business - NOT a
+generic corporate template.
 
 Structure (in this order): a headline that says what the business does for
 whom; one supporting sentence; the full catalog with exact prices as a clear,
-scannable list or cards; the BOOKING FORM (contract below); how booking works
-(pay in full at booking, collection only - no delivery); an accordion-style
-FAQ answering practical customer questions (availability, collection, payment,
-service area); contact details.
+scannable list or cards; the BOOKING FORM (contract below); how booking works,
+stated exactly as the brief states it (payment terms, what happens after
+booking); an accordion-style FAQ answering the practical customer questions
+this specific business raises (availability, what to bring/expect, payment,
+location and area - grounded in the brief); contact details.
 
 BOOKING FORM CONTRACT (follow exactly - the backend depends on it):
 - <form id="booking-form"> containing: a quantity input per catalog item
@@ -60,7 +61,7 @@ Rules:
 - Every catalog item must appear with its price formatted EXACTLY as given in
   the catalog data (e.g. £12/day, £1.50/day).
 - Honesty: no invented reviews, testimonials, star ratings, discounts,
-  guarantees, or services (no delivery, no setup). Facts come from the brief
+  guarantees, or services the brief does not state. Facts come from the brief
   and catalog only.
 
 Respond ONLY with JSON: {"files": {"index.html": "<the complete html>"}}"""
@@ -166,7 +167,17 @@ def build_website(tenant_id: str, run_id: str) -> dict[str, Any]:
             json_mode=True,
             messages=[
                 {"role": "system", "content": REVIEW_PROMPT},
-                {"role": "user", "content": f"BRAND DOCUMENT:\n{brand['full_text']}\n\nHTML:\n{html}"},
+                {
+                    "role": "user",
+                    # The reviewer gets the SAME ground truth as the generator -
+                    # anything less produces false "fabrication" rejections.
+                    "content": f"BRAND DOCUMENT:\n{brand['full_text']}\n\n"
+                    f"BUSINESS BRIEF (source of truth for facts):\n{brief}\n\n"
+                    f"CATALOG (verified prices and availability - legitimate to show):\n{catalog_lines}\n\n"
+                    f"CONTACT (verified): email {tenant.get('business_email')}, "
+                    f"phone {tenant.get('business_phone')}, address {tenant.get('business_address')}\n\n"
+                    f"HTML:\n{html}",
+                },
             ],
         )
         verdict = json.loads(review["content"])

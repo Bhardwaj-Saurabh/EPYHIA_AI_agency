@@ -63,12 +63,13 @@ def check_site(
 
 def _fabrication_problems(lower_text: str, where: str) -> list[str]:
     problems = []
+    # Universal tripwires only - brief-specific service claims are the LLM
+    # review's job (it has the brief; these checks do not).
     for pattern, label in (
         (r"\b\d+%\s*off\b", "a percentage discount"),
         (r"★|⭐|5[- ]star", "star ratings / review symbols"),
         (r"testimonial", "testimonials"),
         (r"money[- ]back guarantee", "a money-back guarantee"),
-        (r"free delivery|we deliver", "delivery (the brief says collection only)"),
     ):
         if re.search(pattern, lower_text):
             problems.append(f"{where} invents {label} that the brief never mentioned")

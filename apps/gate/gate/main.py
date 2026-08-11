@@ -173,6 +173,26 @@ def post_brand_approve(doc_id: str, body: dict[str, Any]) -> dict[str, Any]:
     return _json({"brandDocumentId": doc_id, "unblockedRuns": run_ids})
 
 
+@app.post("/tenants")
+def post_tenants(body: dict[str, Any]) -> dict[str, Any]:
+    """Tenant onboarding (Tier 1 admin path). Idempotent on business_slug."""
+    name = body.get("name")
+    email = body.get("email")
+    business_name = body.get("businessName")
+    slug = body.get("businessSlug")
+    if not name or not email or not business_name or not slug:
+        raise GateError(400, "name, email, businessName, businessSlug required")
+    with pool.connection() as conn:
+        tenant = conn.execute(
+            """INSERT INTO tenants (name, email, business_name, business_slug)
+               VALUES (%s, %s, %s, %s)
+               ON CONFLICT (business_slug) DO UPDATE SET name = EXCLUDED.name
+               RETURNING id, business_slug""",
+            (name, email, business_name, slug),
+        ).fetchone()
+    return _json({"tenant": tenant})
+
+
 @app.get("/tenants/by-slug/{slug}")
 def get_tenant_by_slug(slug: str) -> dict[str, Any]:
     with pool.connection() as conn:
