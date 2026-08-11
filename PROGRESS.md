@@ -5,12 +5,11 @@ the specs. Update when a milestone lands or a decision is made; keep it short.
 
 ## Where we are
 
-- **Phase:** Marketer milestone DONE (README.md §6, item 6) — text pack +
-  storyboard approved, hash-bound. MARKETING_PACK sits at
-  AWAITING_VIDEO_RENDER by design: Veo renders are a separate paid approval
-  and GOOGLE_AI_API_KEY is still empty. Next: Ops/checkout (item 7 — the
-  decisive rubric rows), then the admin dashboard (React SPA on Tier 1),
-  video render when the key lands, Fly deploy of the agency, eval/.
+- **Phase:** Checkout milestone DONE (README.md §6, items 7–8) — the decisive
+  rubric rows are live and proven. Remaining: admin dashboard (React SPA on
+  Tier 1), site booking form (wire the deployed site to /api/checkout), Veo
+  video render (GOOGLE_AI_API_KEY still empty), synthetic go-live purchase
+  check, Fly deploy of the agency, eval/ + PRODUCT_EVAL.md, demo recording.
 - **How to run:** `uv sync --all-packages` + `npm install` (wrangler), then
   `uv run python -m gate.main` / `-m workers.main` / `-m gateway.main`.
   Health: `GET :8082|:8081|:8080/health/live` and `/health/ready`.
@@ -86,6 +85,20 @@ the specs. Update when a milestone lands or a decision is made; keep it short.
   came from context asymmetry — the reviewer must receive the same ground
   truth (brief, live URL) as the generator. Also: task-status transitions now
   use attempt-scoped idempotency keys so retries re-mark status.
+- 2026-08-11 — **Checkout milestone** (Flows 2+3, full three-tier chain):
+  browser sends items/dates/customer only — totals computed server-side in
+  pence from rental_items; availability via SELECT FOR UPDATE + date-overlap
+  (double-booking = DB-impossible); reservation id deterministic from action
+  id (crash-retry can't double-hold stock); REAL Stripe test session created
+  (gate refuses non-sk_test_ keys — caught the publishable key mix-up);
+  webhook raw-body passthrough gateway→workers→gate, signature verified at
+  the gate, deduped by event id + already-confirmed guard, amount/currency
+  compared to the persisted reservation, order + confirm in one transaction.
+  Live demo: £132.00 order row PAID in Neon; redelivery → duplicate no-op;
+  double-click → same reservation; tampered signature → 400. 7 pytest
+  invariants cover it (24 tests total). STRIPE_WEBHOOK_SECRET uses a local
+  dev value — replace when the real Stripe webhook endpoint is created on
+  the deployed gateway.
 
 ## Blocked / owed decisions
 
