@@ -5,12 +5,13 @@ the specs. Update when a milestone lands or a decision is made; keep it short.
 
 ## Where we are
 
-- **Phase:** scaffold in place, gate implementation next.
-- **Next milestone:** the Action Gate pipeline (capability check → approval →
-  budget → idempotency → audit + cost log) with one trivial gated action
-  (a Cloudflare Pages test deploy) — README.md §6, item 2.
+- **Phase:** Action Gate milestone DONE (README.md §6, item 2). Next: the
+  Strategist (brief → brand doc + task list, via gate /model_call) — item 3.
 - **How to run:** `npm install`, then `npm run dev:gate` / `dev:workers` /
   `dev:gateway`. Health: `GET :8082|:8081|:8080/health/live` and `/health/ready`.
+  Migrations: `npx tsx src/migrate.ts` from apps/gate. Tests: `npx vitest run`
+  from root (pipeline tests hit the real Neon dev DB). Gate demo:
+  `npx tsx src/demo.ts` from apps/gate (gate must be running).
   `npm run typecheck` must stay green.
 
 ## Done
@@ -32,6 +33,13 @@ the specs. Update when a milestone lands or a decision is made; keep it short.
   apps/gateway), Node 22 + TS strict + Express, health endpoints boot-tested,
   .env.example documents every variable by owning tier, db/migrations/001_init.sql
   translates DESIGN.md §8 (all unique constraints in place). Typecheck green.
+- 2026-08-11 — **Action Gate milestone**: pipeline (capability → approval →
+  budget → idempotency → audit + cost log → execute) live against Neon; deploy
+  executor pushes to Cloudflare Pages via wrangler and independently verifies
+  HTTP 200 before marking executed; hash-bound approvals; 7 vitest invariant
+  tests green; end-to-end demo proved for real (pending → approve → live URL
+  https://epyhia-gate-check-35951d.pages.dev → 200 → replay: same row, no
+  duplicate deploy). Credentials exist only in gate env.
 
 ## Blocked / owed decisions
 

@@ -9,6 +9,12 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "express": "^4.21.0"
+    "dotenv": "^17.4.2",
+    "express": "^4.21.0",
+    "pg": "^8.23.0",
+    "wrangler": "^4.120.1"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.21.0"
   }
 }
