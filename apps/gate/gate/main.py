@@ -268,6 +268,36 @@ def post_marketing_pack_approve(run_id: str, body: dict[str, Any]) -> dict[str, 
     return _json({"approved": True, "artifacts": len(rows), "packHash": pack_hash})
 
 
+@app.post("/webhooks/stripe")
+async def post_stripe_webhook(request: Request) -> dict[str, Any]:
+    """Raw body + signature arrive unchanged through Tier 1/Tier 2;
+    verification happens HERE, before any processing (DESIGN.md sec. 2)."""
+    from .executors.checkout import process_stripe_webhook
+
+    raw = await request.body()
+    signature = request.headers.get("stripe-signature", "")
+    return process_stripe_webhook(raw, signature)
+
+
+@app.get("/reservations/{reservation_id}")
+def get_reservation(reservation_id: str) -> dict[str, Any]:
+    """Flow 2 step 6: transaction status comes from the DB, never the redirect."""
+    with pool.connection() as conn:
+        resv = conn.execute(
+            """SELECT id, status, total, start_date, end_date, stripe_checkout_session_id
+                 FROM reservations WHERE id = %s""",
+            (reservation_id,),
+        ).fetchone()
+        if resv is None:
+            raise GateError(404, "reservation not found")
+        order = conn.execute(
+            """SELECT id, amount, currency, status, payment_timestamp, is_synthetic
+                 FROM orders WHERE reservation_id = %s""",
+            (reservation_id,),
+        ).fetchone()
+    return _json({"reservation": resv, "order": order})
+
+
 @app.get("/health/live")
 def health_live() -> dict[str, str]:
     return {"status": "ok", "app": "gate"}

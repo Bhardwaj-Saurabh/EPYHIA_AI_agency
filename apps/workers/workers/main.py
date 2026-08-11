@@ -138,6 +138,79 @@ def get_run_route(run_id: str) -> Any:
     return get_run(run_id)
 
 
+# ---- Customer path: deterministic passthrough under Ops' capability scope.
+# No model call sits anywhere in the payment path (DESIGN.md sec. 2).
+
+GATE = os.environ.get("GATE_URL", "http://localhost:8082").rstrip("/")
+
+
+@app.post("/checkout")
+def post_checkout(body: dict[str, Any]) -> Any:
+    tenant_id = body.get("tenantId")
+    checkout_key = body.get("checkoutKey")
+    if not tenant_id and body.get("businessSlug"):
+        # Tenant identity comes from the site/host mapping, never the browser's
+        # say-so on ids (Flow 2 step 1). Slug -> tenant via the gate's read API.
+        import httpx
+
+        res = httpx.get(f"{GATE}/tenants/by-slug/{body['businessSlug']}", timeout=30)
+        if res.status_code != 200:
+            return JSONResponse(status_code=404, content={"error": "unknown business"})
+        tenant_id = res.json()["tenant"]["id"]
+    if not tenant_id or not checkout_key:
+        return JSONResponse(status_code=400, content={"error": "tenantId and checkoutKey required"})
+    result = request_action(
+        tenant_id=tenant_id,
+        agent_name="ops",
+        action_type="checkout_session",
+        payload={
+            "items": body.get("items"),
+            "startDate": body.get("startDate"),
+            "endDate": body.get("endDate"),
+            "customer": body.get("customer"),
+            "siteUrl": body.get("siteUrl"),
+        },
+        idempotency_key=f"checkout-{checkout_key}",
+    )
+    ref = result["action"].get("provider_reference") or ""
+    session_id, _, rest = ref.partition("|")
+    reservation_id, _, rest = rest.partition("|")
+    total, _, url = rest.partition("|")
+    return {
+        "reservationId": reservation_id,
+        "totalPence": int(total) if total else None,
+        "checkoutUrl": url,
+        "replayed": result.get("replayed", False),
+    }
+
+
+@app.post("/webhooks/stripe")
+async def post_stripe_webhook(request: Request) -> Any:
+    """Forward the RAW body and signature unchanged to the gate - verification
+    happens there (DESIGN.md sec. 2)."""
+    import httpx
+
+    raw = await request.body()
+    res = httpx.post(
+        f"{GATE}/webhooks/stripe",
+        content=raw,
+        headers={
+            "stripe-signature": request.headers.get("stripe-signature", ""),
+            "content-type": "application/json",
+        },
+        timeout=60,
+    )
+    return JSONResponse(status_code=res.status_code, content=res.json())
+
+
+@app.get("/reservations/{reservation_id}")
+def get_reservation(reservation_id: str) -> Any:
+    import httpx
+
+    res = httpx.get(f"{GATE}/reservations/{reservation_id}", timeout=30)
+    return JSONResponse(status_code=res.status_code, content=res.json())
+
+
 @app.get("/health/live")
 def health_live() -> dict[str, str]:
     return {"status": "ok", "app": "workers"}

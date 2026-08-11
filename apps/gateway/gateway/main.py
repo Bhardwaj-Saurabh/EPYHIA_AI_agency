@@ -1,17 +1,68 @@
 """Tier 1 - Public API Gateway. Public ingress, no credentials.
-Auth0 login, admin dashboard (static React build), checkout API, and raw
-Stripe webhook passthrough land here per DESIGN.md section 2."""
+Auth0 login and the admin dashboard (static React build) land here later;
+today it carries the customer checkout path and raw Stripe webhook intake
+(DESIGN.md section 2). Everything is deterministic passthrough to Tier 2."""
 
 import os
+import uuid
 from pathlib import Path
+from typing import Any
 
+import httpx
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 load_dotenv(REPO_ROOT / ".env")
 
 app = FastAPI(title="epyhia-gateway")
+WORKERS = os.environ.get("WORKERS_URL", "http://localhost:8081").rstrip("/")
+
+
+@app.post("/api/checkout")
+def post_checkout(body: dict[str, Any]) -> Any:
+    """The generated site's booking form posts here. The browser supplies item
+    ids, quantities, dates and customer details - never a price or tenant id."""
+    body.setdefault("checkoutKey", uuid.uuid4().hex)
+    # Only pass through the fields the contract allows; anything price-shaped
+    # from the client is dropped on the floor.
+    forward = {
+        "businessSlug": body.get("businessSlug"),
+        "tenantId": body.get("tenantId"),
+        "items": body.get("items"),
+        "startDate": body.get("startDate"),
+        "endDate": body.get("endDate"),
+        "customer": body.get("customer"),
+        "siteUrl": body.get("siteUrl"),
+        "checkoutKey": body["checkoutKey"],
+    }
+    res = httpx.post(f"{WORKERS}/checkout", json=forward, timeout=120)
+    return JSONResponse(status_code=res.status_code, content=res.json())
+
+
+@app.post("/webhooks/stripe")
+async def post_stripe_webhook(request: Request) -> Any:
+    """Stripe webhook intake: forward the RAW body and signature unchanged
+    down the chain; signature verification happens in Tier 3."""
+    raw = await request.body()
+    res = httpx.post(
+        f"{WORKERS}/webhooks/stripe",
+        content=raw,
+        headers={
+            "stripe-signature": request.headers.get("stripe-signature", ""),
+            "content-type": "application/json",
+        },
+        timeout=60,
+    )
+    return JSONResponse(status_code=res.status_code, content=res.json())
+
+
+@app.get("/api/reservations/{reservation_id}")
+def get_reservation(reservation_id: str) -> Any:
+    """Customer-facing status: answered from the DB, not the redirect."""
+    res = httpx.get(f"{WORKERS}/reservations/{reservation_id}", timeout=30)
+    return JSONResponse(status_code=res.status_code, content=res.json())
 
 
 @app.get("/health/live")
