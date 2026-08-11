@@ -1,0 +1,27 @@
+# Tier 3 - the Action Gate: sole credential holder, NO public inbound
+# (DESIGN.md sec. 2). Reachable only as http://epyhia-gate.flycast from
+# inside the org network; the administrator uses `fly proxy` for approvals
+# until the dashboard ships on Tier 1.
+app = "epyhia-gate"
+primary_region = "lhr"
+
+[build]
+  dockerfile = "../apps/gate/Dockerfile"
+
+[http_service]
+  internal_port = 8082
+  force_https = false          # private network only
+  auto_stop_machines = "off"   # executes deploys + webhook processing
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "15s"
+    method = "GET"
+    path = "/health/ready"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"               # wrangler (Node) runs inside this image

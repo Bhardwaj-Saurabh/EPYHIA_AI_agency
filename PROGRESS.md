@@ -13,7 +13,15 @@ the specs. Update when a milestone lands or a decision is made; keep it short.
   still empty), Fly deploy of the agency (+ real Stripe webhook endpoint +
   GATEWAY_PUBLIC_URL update + site redeploy), eval/ + PRODUCT_EVAL.md,
   demo recording.
-- **How to run:** `uv sync --all-packages` + `npm install` (wrangler), then
+- **Deployed agency (Fly.io, lhr):** Tier 1 public at
+  https://epyhia-gateway.fly.dev; `epyhia-workers` and `epyhia-gate` are
+  private (Flycast only, no public IPs — per DESIGN §2). Admin access to the
+  gate: `fly proxy 8083:80 epyhia-gate.flycast -a epyhia-gate` (NOT
+  `8083:8082` — the .internal address is IPv6-only and uvicorn binds IPv4).
+  CI/CD: push to main → .github/workflows/deploy.yml runs ruff + pytest,
+  then `flyctl deploy` for all three apps (GitHub secrets: FLY_API_TOKEN,
+  DATABASE_URL, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET).
+- **How to run locally:** `uv sync --all-packages` + `npm install` (wrangler), then
   `uv run python -m gate.main` / `-m workers.main` / `-m gateway.main`.
   Health: `GET :8082|:8081|:8080/health/live` and `/health/ready`.
   Migrations: `uv run python -m gate.migrate`. Tests: `uv run pytest` (hits
@@ -162,6 +170,27 @@ the specs. Update when a milestone lands or a decision is made; keep it short.
   credential scan exempts demo_*.py because demos play the role of Stripe
   (they sign synthetic webhook events). Usage: `uv run python eval/eval.py
   [--judge] [--only <check>]`.
+- 2026-08-11 — **Fly deploy + CI/CD milestone** (README §6 item 9): three
+  Fly apps in lhr matching DESIGN §2's exposure exactly — epyhia-gateway
+  public (shared v4 + dedicated v6), epyhia-workers and epyhia-gate
+  private-only (Flycast; `fly ips list` shows no public ingress). Secrets
+  tier-scoped via `fly secrets import` (11 on gate, 2 pointers on workers,
+  1 on gateway); images built from repo-root context with a .dockerignore
+  that hard-excludes .env and the employer file; the gate image carries
+  Node 22 + wrangler. CI/CD: GitHub Actions on push to main — ruff + pytest
+  (against the dev DB), then a 3-app flyctl deploy matrix. Real Stripe
+  test-mode webhook endpoint (we_1U3HoO…) points at the prod gateway; its
+  signing secret lives only in the gate's Fly secrets. Site redeployed
+  through the PROD gate (deterministic API_BASE swap → new version →
+  hash-bound approval → wrangler ran inside the Fly container → 200 +
+  synthetic purchase). Full over-the-wire prod proof: checkout on the
+  public gateway → real Stripe test session → webhook signed with the real
+  endpoint secret → 3600p PAID order → redelivery duplicate no-op.
+  Gotchas logged: fly.toml resolves `dockerfile` relative to the config
+  file's dir; `fly proxy` must target .flycast:80 (IPv6-only .internal vs
+  IPv4-bound uvicorn); piping deploys to `tail` masks exit codes (set -o
+  pipefail). Eval now 96/100 (agency-deployed 6/6); only launch-video (4)
+  remains.
 
 ## Blocked / owed decisions
 

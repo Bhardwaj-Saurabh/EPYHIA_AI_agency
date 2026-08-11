@@ -1,0 +1,25 @@
+# Tier 2 - agent workers. PRIVATE: no public IP is ever allocated; Tier 1
+# reaches it via Flycast (http://epyhia-workers.flycast). No credentials.
+app = "epyhia-workers"
+primary_region = "lhr"
+
+[build]
+  dockerfile = "../apps/workers/Dockerfile"
+
+[http_service]
+  internal_port = 8081
+  force_https = false          # private network; TLS terminates at Tier 1
+  auto_stop_machines = "off"   # agent pipelines run as background threads
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "15s"
+    method = "GET"
+    path = "/health/ready"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

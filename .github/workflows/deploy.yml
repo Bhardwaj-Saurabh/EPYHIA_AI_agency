@@ -1,0 +1,52 @@
+# CI/CD for the epyhia agency (README.md sec. 6 item 9).
+# Push to main: lint + tests, then deploy all three Fly apps.
+# Secrets used (GitHub repo secrets, never in code):
+#   FLY_API_TOKEN  - Fly.io deploy token (required)
+#   DATABASE_URL, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET - optional; when
+#   present, the integration tests run against the dev database in CI.
+name: ci-cd
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false # never kill a deploy mid-flight
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+      STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - run: uv sync --all-packages
+      - run: uv run ruff check apps/ eval/
+      - name: tests (integration, against the dev DB)
+        if: env.DATABASE_URL != ''
+        run: uv run pytest -q
+      - name: tests skipped
+        if: env.DATABASE_URL == ''
+        run: echo "DATABASE_URL secret not configured - integration tests skipped in CI"
+
+  deploy:
+    needs: checks
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [gate, workers, gateway]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: deploy ${{ matrix.app }}
+        run: flyctl deploy . --config fly/${{ matrix.app }}.toml --remote-only --ha=false
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

@@ -1,0 +1,24 @@
+# Tier 1 - the ONLY publicly reachable app (DESIGN.md sec. 2).
+app = "epyhia-gateway"
+primary_region = "lhr"
+
+[build]
+  dockerfile = "../apps/gateway/Dockerfile"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "off"   # Stripe webhooks must always land
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "15s"
+    method = "GET"
+    path = "/health/ready"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

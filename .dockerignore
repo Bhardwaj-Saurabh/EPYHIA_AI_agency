@@ -1,0 +1,20 @@
+# Never bake into any image: secrets, employer-internal material, junk.
+.env
+.env.*
+!.env.example
+ai-framework-security-blog_6.md
+*delaware*
+*di-ai-framework*
+.git
+.github
+.claude
+.venv
+node_modules
+__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+docs
+README-sample.md
+PRODUCT_EVAL.md
+eval/.judge_cache.json
