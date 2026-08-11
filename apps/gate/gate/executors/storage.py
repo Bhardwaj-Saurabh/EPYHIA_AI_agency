@@ -58,7 +58,104 @@ def business_storage_executor(payload: Any, ctx: ExecutorContext) -> ExecutorRes
         return _finalize_run(p, ctx.tenant_id)
     if op == "record_questions":
         return _record_questions(p, ctx.tenant_id)
+    if op == "set_catalog":
+        return _set_catalog(p, ctx.tenant_id)
     raise ValueError(f"unknown business_storage op '{op}'")
+
+
+def task_storage_executor(payload: Any, ctx: ExecutorContext) -> ExecutorResult:
+    """Runtime task bookkeeping (control-plane, agent 'system')."""
+    p = payload if isinstance(payload, dict) else {}
+    run_id = p.get("runId")
+    task_type = p.get("taskType")
+    status = p.get("status")
+    if not run_id or not task_type or not status:
+        raise ValueError("task_storage needs runId, taskType, status")
+    with pool.connection() as conn, conn.cursor() as cur:
+        if p.get("outputRef") is not None:
+            cur.execute(
+                """UPDATE tasks SET status = %s, output_ref = %s, updated_at = now()
+                    WHERE run_id = %s AND task_type = %s AND tenant_id = %s""",
+                (status, p["outputRef"], run_id, task_type, ctx.tenant_id),
+            )
+        else:
+            cur.execute(
+                """UPDATE tasks SET status = %s, updated_at = now()
+                    WHERE run_id = %s AND task_type = %s AND tenant_id = %s""",
+                (status, run_id, task_type, ctx.tenant_id),
+            )
+        if cur.rowcount == 0:
+            raise ValueError(f"task ({run_id}, {task_type}) not found for tenant")
+    return ExecutorResult(provider_reference=f"task:{task_type}:{status}")
+
+
+def site_storage_executor(payload: Any, ctx: ExecutorContext) -> ExecutorResult:
+    """Web Builder's site storage: persists generated site files onto the
+    WEBSITE task so the admin can review the exact payload they approve."""
+    p = payload if isinstance(payload, dict) else {}
+    run_id = p.get("runId")
+    files = p.get("files")
+    if not run_id or not isinstance(files, dict) or not files:
+        raise ValueError("site_storage needs runId and a non-empty files map")
+    output = json.dumps(
+        {"files": files, "reviewRounds": p.get("reviewRounds"), "projectName": p.get("projectName")}
+    )
+    with pool.connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            """UPDATE tasks SET output_ref = %s, updated_at = now()
+                WHERE run_id = %s AND task_type = 'WEBSITE' AND tenant_id = %s""",
+            (output, run_id, ctx.tenant_id),
+        )
+        if cur.rowcount == 0:
+            raise ValueError(f"WEBSITE task for run {run_id} not found")
+    return ExecutorResult(provider_reference=f"site:{run_id}")
+
+
+def _set_catalog(p: dict[str, Any], tenant_id: str) -> ExecutorResult:
+    """Populates rental_items from the completed brief (CATALOG_SETUP task) and
+    records the business contact details on the tenant. Idempotent: replaces
+    the tenant's catalog wholesale (safe pre-launch; reservations reference
+    items only after checkout exists)."""
+    run_id = p.get("runId")
+    items = p.get("items")
+    if not run_id or not isinstance(items, list) or not items:
+        raise ValueError("set_catalog needs runId and a non-empty items list")
+    for it in items:
+        if not it.get("name") or not isinstance(it.get("dayRateCents"), int) or not isinstance(
+            it.get("availableQty"), int
+        ):
+            raise ValueError("each item needs name, dayRateCents (int), availableQty (int)")
+
+    contact = p.get("businessContact") or {}
+    with pool.connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT count(*) AS n FROM reservation_items ri JOIN rental_items r ON ri.rental_item_id = r.id WHERE r.tenant_id = %s",
+            (tenant_id,),
+        )
+        if cur.fetchone()["n"] > 0:
+            raise ValueError("catalog already has reservations - refusing wholesale replace")
+        cur.execute("DELETE FROM rental_items WHERE tenant_id = %s", (tenant_id,))
+        for it in items:
+            cur.execute(
+                """INSERT INTO rental_items (tenant_id, name, description, available_qty, day_rate)
+                   VALUES (%s, %s, %s, %s, %s)""",
+                (tenant_id, it["name"], it.get("description"), it["availableQty"], it["dayRateCents"]),
+            )
+        if contact:
+            cur.execute(
+                """UPDATE tenants
+                      SET business_email = COALESCE(%s, business_email),
+                          business_phone = COALESCE(%s, business_phone),
+                          business_address = COALESCE(%s, business_address)
+                    WHERE id = %s""",
+                (contact.get("email"), contact.get("phone"), contact.get("address"), tenant_id),
+            )
+        cur.execute(
+            """UPDATE tasks SET status = 'DONE', updated_at = now()
+                WHERE run_id = %s AND task_type = 'CATALOG_SETUP'""",
+            (run_id,),
+        )
+    return ExecutorResult(provider_reference=f"catalog:{len(items)} items")
 
 
 def _finalize_run(p: dict[str, Any], tenant_id: str) -> ExecutorResult:
@@ -80,9 +177,14 @@ def _finalize_run(p: dict[str, Any], tenant_id: str) -> ExecutorResult:
         )
         version = cur.fetchone()["next"]
         cur.execute(
-            """INSERT INTO brand_document (tenant_id, version_number, full_text)
-               VALUES (%s, %s, %s) RETURNING id""",
-            (tenant_id, version, brand_document),
+            """INSERT INTO brand_document (tenant_id, version_number, full_text, content_hash)
+               VALUES (%s, %s, %s, %s) RETURNING id""",
+            (
+                tenant_id,
+                version,
+                brand_document,
+                hashlib.sha256(brand_document.encode("utf-8")).hexdigest(),
+            ),
         )
         doc_id = cur.fetchone()["id"]
         cur.execute(

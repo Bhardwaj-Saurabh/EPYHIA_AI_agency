@@ -81,3 +81,11 @@ def model_call(
 
 def get_run(run_id: str) -> dict[str, Any]:
     return _call(f"/runs/{run_id}")
+
+
+def approve_brand(doc_id: str, approved_by: str, content_hash: str) -> dict[str, Any]:
+    return _call(
+        f"/brand/{doc_id}/approve",
+        method="POST",
+        body={"approvedBy": approved_by, "contentHash": content_hash},
+    )

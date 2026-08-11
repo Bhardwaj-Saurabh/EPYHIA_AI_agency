@@ -124,5 +124,12 @@ def deploy_executor(payload: Any, ctx: ExecutorContext) -> ExecutorResult:
                      updated_at = now()""",
             (ctx.tenant_id, project_name, live_url, ctx.action_id),
         )
+        # The WEBSITE task is complete only once reality is verified above.
+        if ctx.run_id:
+            conn.execute(
+                """UPDATE tasks SET status = 'DONE', updated_at = now()
+                    WHERE run_id = %s AND task_type = 'WEBSITE'""",
+                (ctx.run_id,),
+            )
 
     return ExecutorResult(provider_reference=live_url)

@@ -5,11 +5,11 @@ the specs. Update when a milestone lands or a decision is made; keep it short.
 
 ## Where we are
 
-- **Phase:** backend ported to Python (user decision 2026-08-11); Strategist
-  milestone re-verified in Python. Next: the Web Builder (generate the site
-  from the approved brand doc, deploy through the gate) — item 4. Brand
-  approval flow (dashboard) becomes needed soon: runs stop at
-  AWAITING_BRAND_APPROVAL by design.
+- **Phase:** Web Builder milestone DONE (README.md §6, item 4) — the week-1
+  pipeline is complete: brief → brand doc → approval → catalog → site → gated
+  deploy → verified live URL. Next: week 2 — the Marketer (item 6) and the
+  admin dashboard (React SPA on Tier 1, needed for real approval UX), then
+  Ops/checkout (item 7).
 - **How to run:** `uv sync --all-packages` + `npm install` (wrangler), then
   `uv run python -m gate.main` / `-m workers.main` / `-m gateway.main`.
   Health: `GET :8082|:8081|:8080/health/live` and `/health/ready`.
@@ -59,6 +59,19 @@ the specs. Update when a milestone lands or a decision is made; keep it short.
   changed payloads), all 7 invariant tests re-pass via pytest, ruff clean, and
   a fresh Luna call through the Python gate hit Azure for real (11 µ$ logged).
   Wrangler remains the one Node dependency (gate shells out for Pages deploys).
+- 2026-08-11 — **Web Builder milestone**: brand approval endpoint (bound to
+  brand_document content_hash, migration 002; unblocks downstream tasks);
+  Ops/Luna catalog extraction into rental_items (idempotent wholesale replace,
+  guarded once reservations exist); Web Builder loop per DESIGN §11 — Sol
+  generates, deterministic grounding checks (prices/items/contact/fabrication
+  tripwires, unit-tested), independent Terra review, revision rounds revise
+  the previous HTML (max 3); site stored on the task so the admin approves the
+  exact reviewed payload; deploy hash-approved at the gate → REAL site:
+  https://epyhia-gate-demo.pages.dev (verified 200, all 5 real prices on
+  page). Re-approval + replay changed nothing. Run spend: $0.95 of $2.00.
+  Lesson logged: first attempt burned 3 Sol rounds because the reviewer had no
+  calibration and regeneration started from scratch — fixed by revise-not-
+  regenerate + reject-only-for-nameable-violations prompt (1 round after fix).
 
 ## Blocked / owed decisions
 

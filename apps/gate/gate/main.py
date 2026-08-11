@@ -101,10 +101,76 @@ def get_run(run_id: str) -> dict[str, Any]:
         brand = None
         if run["brand_document_id"]:
             brand = conn.execute(
-                "SELECT id, version_number, full_text FROM brand_document WHERE id = %s",
+                """SELECT id, version_number, full_text, content_hash, approved_by, approved_at
+                     FROM brand_document WHERE id = %s""",
                 (run["brand_document_id"],),
             ).fetchone()
-    return _json({"run": run, "tasks": tasks, "brandDocument": brand})
+        tenant = conn.execute(
+            """SELECT id, business_name, business_slug, business_email, business_phone,
+                      business_address
+                 FROM tenants WHERE id = %s""",
+            (run["tenant_id"],),
+        ).fetchone()
+        catalog = conn.execute(
+            """SELECT id, name, description, available_qty, day_rate
+                 FROM rental_items WHERE tenant_id = %s ORDER BY name""",
+            (run["tenant_id"],),
+        ).fetchall()
+        deployment = conn.execute(
+            """SELECT cloudflare_project_name, live_url, verified_at
+                 FROM deployments WHERE tenant_id = %s""",
+            (run["tenant_id"],),
+        ).fetchone()
+    return _json(
+        {
+            "run": run,
+            "tasks": tasks,
+            "brandDocument": brand,
+            "tenant": tenant,
+            "catalog": catalog,
+            "deployment": deployment,
+        }
+    )
+
+
+@app.post("/brand/{doc_id}/approve")
+def post_brand_approve(doc_id: str, body: dict[str, Any]) -> dict[str, Any]:
+    """Flow 1 step 6: administrator approval bound to the brand-document id and
+    content hash. Unblocks the run's downstream tasks."""
+    approved_by = body.get("approvedBy")
+    content_hash = body.get("contentHash")
+    if not approved_by or not content_hash:
+        raise GateError(400, "approvedBy and contentHash required")
+
+    with pool.connection() as conn, conn.cursor() as cur:
+        cur.execute("SELECT * FROM brand_document WHERE id = %s FOR UPDATE", (doc_id,))
+        doc = cur.fetchone()
+        if doc is None:
+            raise GateError(404, "brand document not found")
+        if doc["content_hash"] != content_hash:
+            raise GateError(
+                409,
+                "approval hash does not match this brand document version - re-review it",
+            )
+        if doc["approved_by"] is None:
+            cur.execute(
+                "UPDATE brand_document SET approved_by = %s, approved_at = now() WHERE id = %s",
+                (approved_by, doc_id),
+            )
+        cur.execute(
+            """UPDATE runs SET status = 'BRAND_APPROVED'
+                WHERE brand_document_id = %s AND status = 'AWAITING_BRAND_APPROVAL'
+                RETURNING id""",
+            (doc_id,),
+        )
+        run_ids = [str(r["id"]) for r in cur.fetchall()]
+        for run_id in run_ids:
+            cur.execute(
+                """UPDATE tasks SET status = 'PENDING', updated_at = now()
+                    WHERE run_id = %s AND status = 'BLOCKED_ON_BRAND_APPROVAL'""",
+                (run_id,),
+            )
+    return _json({"brandDocumentId": doc_id, "unblockedRuns": run_ids})
 
 
 @app.get("/tenants/by-slug/{slug}")

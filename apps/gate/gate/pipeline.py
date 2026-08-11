@@ -32,6 +32,7 @@ class ExecutorContext:
     tenant_id: str
     action_id: str
     mode: str
+    run_id: str | None = None
 
 
 @dataclass
@@ -71,7 +72,10 @@ def _execute(row: dict[str, Any], payload: Any, config: PipelineConfig) -> dict[
         result = executor(
             payload,
             ExecutorContext(
-                tenant_id=str(row["tenant_id"]), action_id=str(row["id"]), mode=row["mode"]
+                tenant_id=str(row["tenant_id"]),
+                action_id=str(row["id"]),
+                mode=row["mode"],
+                run_id=str(row["run_id"]) if row.get("run_id") else None,
             ),
         )
     except GateError:

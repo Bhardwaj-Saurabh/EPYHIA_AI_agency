@@ -13,13 +13,15 @@ select = ["E", "F", "I", "UP", "B"]
 
 [tool.ruff.lint.per-file-ignores]
 # Demo scripts are print-heavy walkthroughs; long lines are fine there.
-"**/demo.py" = ["E501"]
+"**/demo*.py" = ["E501"]
 # Prompts and SQL sometimes exceed the limit legitimately.
 "**/strategist.py" = ["E501"]
 "**/pipeline.py" = ["E501"]
 "**/modelcall.py" = ["E501"]
 "**/main.py" = ["E501"]
 "**/models_ai.py" = ["E501"]
+"**/web_builder.py" = ["E501"]
+"**/executors/storage.py" = ["E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["apps/gate/tests", "apps/workers/tests"]
