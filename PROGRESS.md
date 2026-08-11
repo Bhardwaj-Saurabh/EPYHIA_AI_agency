@@ -5,11 +5,13 @@ the specs. Update when a milestone lands or a decision is made; keep it short.
 
 ## Where we are
 
-- **Phase:** Checkout milestone DONE (README.md §6, items 7–8) — the decisive
-  rubric rows are live and proven. Remaining: admin dashboard (React SPA on
-  Tier 1), site booking form (wire the deployed site to /api/checkout), Veo
-  video render (GOOGLE_AI_API_KEY still empty), synthetic go-live purchase
-  check, Fly deploy of the agency, eval/ + PRODUCT_EVAL.md, demo recording.
+- **Phase:** customer loop CLOSED — the live site sells (booking form → 
+  /api/checkout → Stripe → order row), and go-live verification requires the
+  synthetic end-to-end purchase (failure catalogue #8 control, live).
+  Remaining: admin dashboard (React SPA on Tier 1), Veo video render
+  (GOOGLE_AI_API_KEY still empty), Fly deploy of the agency (+ real Stripe
+  webhook endpoint + GATEWAY_PUBLIC_URL update + site redeploy), eval/ +
+  PRODUCT_EVAL.md, demo recording.
 - **How to run:** `uv sync --all-packages` + `npm install` (wrangler), then
   `uv run python -m gate.main` / `-m workers.main` / `-m gateway.main`.
   Health: `GET :8082|:8081|:8080/health/live` and `/health/ready`.
@@ -99,6 +101,20 @@ the specs. Update when a milestone lands or a decision is made; keep it short.
   invariants cover it (24 tests total). STRIPE_WEBHOOK_SECRET uses a local
   dev value — replace when the real Stripe webhook endpoint is created on
   the deployed gateway.
+- 2026-08-11 — **Site v2 + synthetic go-live check**: the generated site now
+  carries a booking form under a strict contract (qty inputs with
+  data-item-id per catalog item, date/name/email fields, vanilla-JS POST to
+  GATEWAY_PUBLIC_URL/api/checkout, NO client-side totals) enforced by
+  deterministic checks before review; gateway gained CORS for *.pages.dev.
+  Deploy verification is now two-step: HTTP 200 AND a synthetic end-to-end
+  purchase (real Stripe test session + signed completed event through the
+  full webhook path) persisting a synthetic-flagged PAID order — verified
+  live: 1 synthetic order (150p), real orders untouched. Deploy/site
+  idempotency keys are version-scoped (new site version = new audited
+  action; same version still replays). Run spend: $1.40 of $2.00.
+  Note for eval: pages.dev serves the previous version for ~30-60s after
+  deploy — content checks must cache-bust or retry (the gate's own checks
+  are API-path based and unaffected).
 
 ## Blocked / owed decisions
 

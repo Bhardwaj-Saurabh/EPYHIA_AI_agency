@@ -19,6 +19,17 @@ load_dotenv(REPO_ROOT / ".env")
 app = FastAPI(title="epyhia-gateway")
 WORKERS = os.environ.get("WORKERS_URL", "http://localhost:8081").rstrip("/")
 
+# The generated business sites live on *.pages.dev and call /api/checkout
+# cross-origin. Nothing here is credentialed - Tier 1 holds no secrets.
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=r"https://[a-z0-9-]+\.pages\.dev|http://localhost(:\d+)?",
+    allow_methods=["GET", "POST"],
+    allow_headers=["content-type"],
+)
+
 
 @app.post("/api/checkout")
 def post_checkout(body: dict[str, Any]) -> Any:

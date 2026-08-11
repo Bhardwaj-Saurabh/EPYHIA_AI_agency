@@ -255,6 +255,37 @@ def test_expired_session_releases_availability(biz):
     assert rid2
 
 
+def test_synthetic_flag_mirrors_to_order(biz):
+    from gate.executors.checkout import run_checkout
+
+    result = run_checkout(
+        {
+            "items": [{"rentalItemId": biz["chair"], "qty": 1}],
+            "startDate": "2027-02-01",
+            "endDate": "2027-02-01",
+            "customer": {"name": "Synthetic", "email": "synthetic@epyhia.internal"},
+            "siteUrl": "https://example.test",
+        },
+        tenant_id=biz["tenant_id"],
+        seed_id=f"synthetic-test-{uuid.uuid4().hex[:8]}",
+        synthetic=True,
+    )
+    session_id, _, rest = result.provider_reference.partition("|")
+    reservation_id, _, rest = rest.partition("|")
+    total = int(rest.partition("|")[0])
+
+    payload, sig = signed(completed_event(session_id, reservation_id, total))
+    process_stripe_webhook(payload, sig)
+
+    with pool.connection() as conn:
+        order = conn.execute(
+            "SELECT is_synthetic, status FROM orders WHERE reservation_id = %s",
+            (reservation_id,),
+        ).fetchone()
+    assert order["is_synthetic"] is True
+    assert order["status"] == "PAID"
+
+
 def test_bad_signature_rejected(biz):
     payload = json.dumps({"id": "evt_x", "type": "checkout.session.completed"}).encode()
     with pytest.raises(GateError) as exc:

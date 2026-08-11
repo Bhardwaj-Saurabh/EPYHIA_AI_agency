@@ -9,6 +9,7 @@ catalog -> a deployable site, through the anti-slop loop:
 It never deploys directly and never touches payment code.
 """
 
+import hashlib
 import json
 import logging
 import uuid
@@ -27,13 +28,32 @@ corporate template.
 
 Structure (in this order): a headline that says what the business does for
 whom; one supporting sentence; the full catalog with exact prices as a clear,
-scannable list or cards; how booking works (pay in full at booking, collection
-only - no delivery); an accordion-style FAQ answering practical customer
-questions (availability, collection, payment, service area); contact details.
+scannable list or cards; the BOOKING FORM (contract below); how booking works
+(pay in full at booking, collection only - no delivery); an accordion-style
+FAQ answering practical customer questions (availability, collection, payment,
+service area); contact details.
+
+BOOKING FORM CONTRACT (follow exactly - the backend depends on it):
+- <form id="booking-form"> containing: a quantity input per catalog item
+  (type="number", min="0", value="0", data-item-id="<the item's id from the
+  catalog data>"), start and end date inputs (type="date", required), customer
+  name and email inputs (required), and a submit button styled per the brand.
+- On submit (vanilla JS, preventDefault): collect items with qty > 0 as
+  [{rentalItemId: el.dataset.itemId, qty: Number(el.value)}]; POST JSON to
+  API_BASE + "/api/checkout" with body {businessSlug: BUSINESS_SLUG, items,
+  startDate, endDate, customer: {name, email}, siteUrl: window.location.origin};
+  on success redirect with window.location = response.checkoutUrl; on error
+  show the server's error message near the form (no alert()).
+- Do NOT display or compute any total in the browser - the price is
+  authoritative on the server and the form says so in one honest sentence
+  ("You'll see the exact total on the secure payment page.").
+- Define const API_BASE and const BUSINESS_SLUG once at the top of the script,
+  using the exact values given in the context.
 
 Rules:
 - Mobile-first, single file: inline CSS in one index.html, no external
-  resources, no JavaScript frameworks (vanilla JS for the accordion is fine).
+  resources, no JavaScript frameworks (vanilla JS for the accordion and the
+  booking form is fine).
 - Include <meta name="viewport" content="width=device-width, initial-scale=1">.
 - Follow the brand document exactly: palette, typography guidance (system font
   stacks approximating the named fonts are fine), voice and tone.
@@ -87,8 +107,11 @@ def build_website(tenant_id: str, run_id: str) -> dict[str, Any]:
 
     _update_task(tenant_id, run_id, "WEBSITE", "IN_PROGRESS")
 
+    import os
+
+    api_base = os.environ.get("GATEWAY_PUBLIC_URL", "http://localhost:8080").rstrip("/")
     catalog_lines = "\n".join(
-        f"- {item['name']}: {format_rate_gbp(item['day_rate'])}/day, "
+        f"- {item['name']} (id: {item['id']}): {format_rate_gbp(item['day_rate'])}/day, "
         f"{item['available_qty']} available"
         + (f" - {item['description']}" if item.get("description") else "")
         for item in catalog
@@ -96,9 +119,11 @@ def build_website(tenant_id: str, run_id: str) -> dict[str, Any]:
     context = (
         f"BRAND DOCUMENT:\n{brand['full_text']}\n\n"
         f"BUSINESS BRIEF:\n{brief}\n\n"
-        f"CATALOG (render prices exactly as shown):\n{catalog_lines}\n\n"
+        f"CATALOG (render prices exactly as shown; use each id in data-item-id):\n{catalog_lines}\n\n"
         f"CONTACT: email {tenant.get('business_email')}, phone {tenant.get('business_phone')}, "
-        f"address {tenant.get('business_address')}"
+        f"address {tenant.get('business_address')}\n"
+        f"API_BASE: {api_base}\n"
+        f"BUSINESS_SLUG: {tenant['business_slug']}"
     )
 
     feedback: str | None = None
@@ -128,7 +153,7 @@ def build_website(tenant_id: str, run_id: str) -> dict[str, Any]:
         files = json.loads(result["content"])["files"]
         html = files["index.html"]
 
-        problems = check_site(html, catalog, tenant.get("business_email"))
+        problems = check_site(html, catalog, tenant.get("business_email"), require_booking_form=True)
         if problems:
             feedback = "Deterministic checks failed:\n" + "\n".join(f"- {p}" for p in problems)
             log.info("round %d: %d deterministic problems: %s", rounds, len(problems), problems)
@@ -156,6 +181,9 @@ def build_website(tenant_id: str, run_id: str) -> dict[str, Any]:
 
     project_name = f"epyhia-{tenant['business_slug']}"
     files = {"index.html": html}
+    # Version-scoped keys: each distinct site version is its own audited
+    # action; replays of the SAME version still replay.
+    version = hashlib.sha256(html.encode("utf-8")).hexdigest()[:8]
 
     # Store the exact reviewed site so the admin approves what they can see.
     request_action(
@@ -164,7 +192,7 @@ def build_website(tenant_id: str, run_id: str) -> dict[str, Any]:
         agent_name="web_builder",
         action_type="site_storage",
         payload={"runId": run_id, "files": files, "reviewRounds": rounds, "projectName": project_name},
-        idempotency_key=f"site-{run_id}-r{rounds}",
+        idempotency_key=f"site-{run_id}-{version}",
     )
 
     # Request the deploy - hash-bound admin approval; execution happens only
@@ -175,7 +203,7 @@ def build_website(tenant_id: str, run_id: str) -> dict[str, Any]:
         agent_name="web_builder",
         action_type="deploy",
         payload={"projectName": project_name, "files": files},
-        idempotency_key=f"deploy-{run_id}",
+        idempotency_key=f"deploy-{run_id}-{version}",
     )
     _update_task(tenant_id, run_id, "WEBSITE", "AWAITING_DEPLOY_APPROVAL")
 

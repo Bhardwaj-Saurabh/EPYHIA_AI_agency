@@ -298,6 +298,21 @@ def get_reservation(reservation_id: str) -> dict[str, Any]:
     return _json({"reservation": resv, "order": order})
 
 
+@app.get("/tenants/{tenant_id}/orders")
+def get_tenant_orders(tenant_id: str) -> dict[str, Any]:
+    """Order evidence for the dashboard/eval: real and synthetic, separated."""
+    with pool.connection() as conn:
+        orders = conn.execute(
+            """SELECT id, reservation_id, amount, currency, status, payment_timestamp,
+                      is_synthetic, created_at
+                 FROM orders WHERE tenant_id = %s ORDER BY created_at""",
+            (tenant_id,),
+        ).fetchall()
+    real = [o for o in orders if not o["is_synthetic"]]
+    synthetic = [o for o in orders if o["is_synthetic"]]
+    return _json({"real": real, "synthetic": synthetic})
+
+
 @app.get("/health/live")
 def health_live() -> dict[str, str]:
     return {"status": "ok", "app": "gate"}

@@ -2,6 +2,7 @@
 verifies the live URL answers before reporting success (DESIGN.md sec. 5.7,
 failure catalogue #1 - never trust a self-report)."""
 
+import logging
 import os
 import re
 import subprocess
@@ -15,6 +16,8 @@ import httpx
 from ..db import pool
 from ..env import REPO_ROOT
 from ..pipeline import ExecutorContext, ExecutorResult
+
+log = logging.getLogger("gate.deploy")
 
 _PROJECT_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,56}$")
 
@@ -106,9 +109,24 @@ def deploy_executor(payload: Any, ctx: ExecutorContext) -> ExecutorResult:
             capture_output=True,
         )
 
-    # Independent verification: the production URL must actually answer.
+    # Independent verification, step 1: the production URL must actually answer.
     live_url = f"https://{project_name}.pages.dev"
     _verify_live(live_url)
+
+    # Step 2 (DESIGN.md sec. 5.7, failure catalogue #8): a live URL whose
+    # checkout does not take money is not a deployed business. When the tenant
+    # has a catalog, an end-to-end synthetic purchase must persist a
+    # synthetic-flagged order row before this deploy may be marked verified.
+    from ..synthetic import run_synthetic_purchase
+
+    with pool.connection() as conn:
+        has_catalog = conn.execute(
+            "SELECT 1 FROM rental_items WHERE tenant_id = %s LIMIT 1", (ctx.tenant_id,)
+        ).fetchone()
+    if has_catalog:
+        run_synthetic_purchase(ctx.tenant_id, seed=ctx.action_id, site_url=live_url)
+    else:
+        log.info("no catalog for tenant %s yet - synthetic purchase skipped", ctx.tenant_id)
 
     with pool.connection() as conn:
         conn.execute(

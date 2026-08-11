@@ -62,6 +62,15 @@ def create_stripe_session(
 
 
 def checkout_session_executor(payload: Any, ctx: ExecutorContext) -> ExecutorResult:
+    return run_checkout(payload, tenant_id=ctx.tenant_id, seed_id=ctx.action_id)
+
+
+def run_checkout(
+    payload: Any, *, tenant_id: str, seed_id: str, synthetic: bool = False
+) -> ExecutorResult:
+    """Core checkout: also used by the synthetic go-live purchase check with
+    synthetic=True, which flags the reservation (and therefore the order) so
+    verification evidence never pollutes business reporting."""
     p = payload if isinstance(payload, dict) else {}
     items = p.get("items")
     customer = p.get("customer") or {}
@@ -80,7 +89,7 @@ def checkout_session_executor(payload: Any, ctx: ExecutorContext) -> ExecutorRes
     # Deterministic reservation id from the action id: a crash-retry of the
     # same gated action re-finds its own reservation instead of double-holding
     # availability.
-    reservation_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"epyhia-reservation-{ctx.action_id}"))
+    reservation_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"epyhia-reservation-{seed_id}"))
     days = _rental_days(start, end)
 
     with pool.connection() as conn, conn.cursor() as cur:
@@ -96,7 +105,7 @@ def checkout_session_executor(payload: Any, ctx: ExecutorContext) -> ExecutorRes
                    ON CONFLICT (tenant_id, normalized_email)
                      DO UPDATE SET name = EXCLUDED.name
                    RETURNING id""",
-                (ctx.tenant_id, customer["name"], customer["email"], normalized),
+                (tenant_id, customer["name"], customer["email"], normalized),
             )
             customer_id = cur.fetchone()["id"]
 
@@ -106,7 +115,7 @@ def checkout_session_executor(payload: Any, ctx: ExecutorContext) -> ExecutorRes
             cur.execute(
                 """SELECT id, name, available_qty, day_rate FROM rental_items
                     WHERE tenant_id = %s AND id = ANY(%s) FOR UPDATE""",
-                (ctx.tenant_id, item_ids),
+                (tenant_id, item_ids),
             )
             catalog = {str(r["id"]): r for r in cur.fetchall()}
             if len(catalog) != len(set(item_ids)):
@@ -138,9 +147,9 @@ def checkout_session_executor(payload: Any, ctx: ExecutorContext) -> ExecutorRes
 
             cur.execute(
                 """INSERT INTO reservations
-                     (id, tenant_id, customer_id, start_date, end_date, status, total)
-                   VALUES (%s, %s, %s, %s, %s, 'PENDING', %s)""",
-                (reservation_id, ctx.tenant_id, customer_id, start, end, total),
+                     (id, tenant_id, customer_id, start_date, end_date, status, total, is_synthetic)
+                   VALUES (%s, %s, %s, %s, %s, 'PENDING', %s, %s)""",
+                (reservation_id, tenant_id, customer_id, start, end, total, synthetic),
             )
             for i in items:
                 row = catalog[str(i["rentalItemId"])]
@@ -273,7 +282,7 @@ def process_stripe_webhook(raw_body: bytes, signature: str) -> dict[str, Any]:
             """INSERT INTO orders
                  (tenant_id, reservation_id, stripe_checkout_session_id, amount, currency,
                   status, payment_timestamp, is_synthetic)
-               VALUES (%s, %s, %s, %s, %s, 'PAID', %s, false)""",
+               VALUES (%s, %s, %s, %s, %s, 'PAID', %s, %s)""",
             (
                 resv["tenant_id"],
                 reservation_id,
@@ -281,6 +290,7 @@ def process_stripe_webhook(raw_body: bytes, signature: str) -> dict[str, Any]:
                 resv["total"],
                 CURRENCY,
                 datetime.fromtimestamp(event["created"], tz=UTC),
+                resv["is_synthetic"],
             ),
         )
         cur.execute(

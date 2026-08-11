@@ -81,6 +81,25 @@ def test_marketing_wrong_email_flagged():
     assert any("unknown email" in p for p in problems)
 
 
+def test_booking_form_required_and_checked():
+    catalog = [{"id": "abc-123", "name": "Chair", "day_rate": 150}]
+    html = good_html().replace("Folding chair", "Chair").replace("£1.50/day", "£1.50/day")
+    problems = check_site(html, catalog, None, require_booking_form=True)
+    assert any("booking-form" in p for p in problems)
+    assert any("/api/checkout" in p for p in problems)
+    assert any("Chair" in p and "qty input" in p for p in problems)
+
+    with_form = html.replace(
+        "</body>",
+        """<form id="booking-form">
+        <input type="number" data-item-id="abc-123" min="0" value="0">
+        <input type="date"><input type="date">
+        </form><script>fetch(API_BASE + "/api/checkout")</script></body>""",
+    )
+    problems = check_site(with_form, catalog, None, require_booking_form=True)
+    assert problems == []
+
+
 def test_marketing_email_at_sentence_end_passes():
     from workers.checks import check_marketing_text
 

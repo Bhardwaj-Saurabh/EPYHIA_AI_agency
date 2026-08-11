@@ -17,10 +17,23 @@ def check_site(
     html: str,
     catalog: list[dict],
     business_email: str | None,
+    *,
+    require_booking_form: bool = False,
 ) -> list[str]:
     """Returns a list of problems; empty means the page passes."""
     problems: list[str] = []
     lower = html.lower()
+
+    if require_booking_form:
+        if 'id="booking-form"' not in lower:
+            problems.append('missing <form id="booking-form">')
+        if "/api/checkout" not in html:
+            problems.append("booking form does not post to /api/checkout")
+        if 'type="date"' not in lower:
+            problems.append("booking form has no date inputs")
+        for item in catalog:
+            if item.get("id") and f'data-item-id="{item["id"]}"' not in html:
+                problems.append(f"booking form missing qty input for '{item['name']}'")
 
     for marker in ("lorem ipsum", "todo", "placeholder text", "your text here", "[insert"):
         if marker in lower:

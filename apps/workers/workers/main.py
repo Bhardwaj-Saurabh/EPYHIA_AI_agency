@@ -138,6 +138,26 @@ def get_run_route(run_id: str) -> Any:
     return get_run(run_id)
 
 
+@app.post("/runs/{run_id}/rebuild-website")
+def post_rebuild_website(run_id: str, body: dict[str, Any]) -> Any:
+    """Regenerate + redeploy the site (e.g. after a template upgrade). The new
+    version goes through the same review loop and a fresh hash-bound deploy
+    approval - redeploys overwrite, never duplicate (DESIGN.md sec. 10)."""
+    tenant_id = body.get("tenantId")
+    if not tenant_id:
+        return JSONResponse(status_code=400, content={"error": "tenantId required"})
+
+    def _rebuild() -> None:
+        try:
+            outcome = build_website(tenant_id, run_id)
+            log.info("website rebuild for run %s: %s", run_id, outcome)
+        except Exception:
+            log.exception("website rebuild failed for run %s", run_id)
+
+    threading.Thread(target=_rebuild, daemon=True).start()
+    return JSONResponse(status_code=202, content={"rebuilding": run_id})
+
+
 # ---- Customer path: deterministic passthrough under Ops' capability scope.
 # No model call sits anywhere in the payment path (DESIGN.md sec. 2).
 
