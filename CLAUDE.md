@@ -61,13 +61,43 @@ Strategist, Web Builder, week-1 demo; then Marketer, Ops/checkout, eval.
 
 ## Claude Code harness (.claude/)
 
-- `agents/react-frontend-expert.md` — dashboard/UI work (React+Vite+shadcn,
-  no Next.js, no shadcn MCP server).
-- `agents/code-reviewer.md` — reviews changes against this project's invariants
-  (gate boundary, idempotency, webhook handling, integer money).
-- `hooks/formatter.sh` — PostToolUse prettier/ruff formatting; no-ops until
-  those tools are installed.
-- This root CLAUDE.md is the **only** CLAUDE.md — don't create per-folder ones.
+Agents:
+- `react-frontend-expert` — dashboard/UI work (React+Vite+shadcn, no Next.js,
+  no shadcn MCP server).
+- `node-backend-expert` — tiers/gate/Stripe/Neon/Fly work, builds to
+  DESIGN.md's invariants.
+- `code-reviewer` — reviews changes against the project invariants (gate
+  boundary, idempotency, webhook handling, integer money, hash-bound approvals).
+- `eval-engineer` — owns eval/rubric.json, eval/eval.py, PRODUCT_EVAL.md;
+  turns rubric rows and observed failures into automated checks.
+
+Commands:
+- `/track` — where the build stands vs README §6's order; flags drift; updates
+  PROGRESS.md.
+- `/eval` — one turn of the eval-driven development loop: run evals, diff
+  results, recommend the single highest-value fix.
+- `/invariants` — deterministic scan for gate bypass, secrets in code, float
+  money, unverified webhooks.
+
+Hooks (enforced, not advisory): bulk `git add` and force-push/amend are
+blocked; edits to course files and key-shaped strings in tracked files are
+blocked; Write/Edit auto-formats.
+
+This root CLAUDE.md is the **only** CLAUDE.md — don't create per-folder ones.
+
+## Working method
+
+- **Eval-driven development** (docs/eval-driven-development.png): evals come
+  early, not last. The README §7 rubric is the business metric; `eval/` is the
+  measurement; improvements are chosen by what moves failing checks. When a
+  new failure mode appears, a check for it is added.
+- **Session start:** read PROGRESS.md first — it is the one-page state of the
+  build. Trust it unless the repo contradicts it; update it when milestones
+  land.
+- **Token discipline:** never read README-sample.md (80KB) unless a specific
+  section is needed — everything operative is in DESIGN.md, README.md §6–7,
+  and PROGRESS.md. Prefer Explore agents for broad searches; read files
+  surgically once code exists.
 
 ## Architecture the eventual system must have (per README.md)
 
