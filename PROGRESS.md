@@ -5,10 +5,13 @@ the specs. Update when a milestone lands or a decision is made; keep it short.
 
 ## Where we are
 
-- **Phase:** design complete, implementation not started.
-- **Next milestone:** the Action Gate (Tier 3) with one trivial gated action
-  (a test deploy): capability check, approval, idempotency, audit row, cost
-  log — README.md §6, item 2.
+- **Phase:** scaffold in place, gate implementation next.
+- **Next milestone:** the Action Gate pipeline (capability check → approval →
+  budget → idempotency → audit + cost log) with one trivial gated action
+  (a Cloudflare Pages test deploy) — README.md §6, item 2.
+- **How to run:** `npm install`, then `npm run dev:gate` / `dev:workers` /
+  `dev:gateway`. Health: `GET :8082|:8081|:8080/health/live` and `/health/ready`.
+  `npm run typecheck` must stay green.
 
 ## Done
 
@@ -25,6 +28,10 @@ the specs. Update when a milestone lands or a decision is made; keep it short.
 - 2026-08-11 — Claude Code harness in place: agents (react-frontend-expert,
   node-backend-expert, code-reviewer, eval-engineer), commands (/track, /eval,
   /invariants), guard hooks, formatter.
+- 2026-08-11 — Monorepo scaffold: npm workspaces (apps/gate, apps/workers,
+  apps/gateway), Node 22 + TS strict + Express, health endpoints boot-tested,
+  .env.example documents every variable by owning tier, db/migrations/001_init.sql
+  translates DESIGN.md §8 (all unique constraints in place). Typecheck green.
 
 ## Blocked / owed decisions
 
