@@ -5,8 +5,10 @@ the specs. Update when a milestone lands or a decision is made; keep it short.
 
 ## Where we are
 
-- **Phase:** Action Gate milestone DONE (README.md §6, item 2). Next: the
-  Strategist (brief → brand doc + task list, via gate /model_call) — item 3.
+- **Phase:** Strategist milestone DONE (README.md §6, item 3). Next: the
+  Web Builder (generate the site from the approved brand doc, deploy through
+  the gate) — item 4. Brand approval flow (dashboard) becomes needed soon:
+  runs stop at AWAITING_BRAND_APPROVAL by design.
 - **How to run:** `npm install`, then `npm run dev:gate` / `dev:workers` /
   `dev:gateway`. Health: `GET :8082|:8081|:8080/health/live` and `/health/ready`.
   Migrations: `npx tsx src/migrate.ts` from apps/gate. Tests: `npx vitest run`
@@ -40,6 +42,15 @@ the specs. Update when a milestone lands or a decision is made; keep it short.
   tests green; end-to-end demo proved for real (pending → approve → live URL
   https://epyhia-gate-check-35951d.pages.dev → 200 → replay: same row, no
   duplicate deploy). Credentials exist only in gate env.
+- 2026-08-11 — **Strategist milestone**: gate /model_call (Azure OpenAI v1
+  chat completions, tier-per-agent enforcement, per-run budget cap, every call
+  cost-logged to agent_calls in microdollars); run_shell + business_storage
+  executors (Tier 2 has no DB — all persistence is gated); workers app runs
+  the Strategist (Sol, JSON contract, honesty rules, clarification loop for
+  incomplete briefs, Ops delegated for persistence). Real end-to-end demo:
+  BrightSide Party Rentals brief → run 202 → real Sol call → brand doc v1
+  (5.8k chars, grounded, no invented facts) + 4 tasks BLOCKED_ON_BRAND_APPROVAL
+  → spent $0.056 of $2.00 budget → replay returned same run, no second call.
 
 ## Blocked / owed decisions
 

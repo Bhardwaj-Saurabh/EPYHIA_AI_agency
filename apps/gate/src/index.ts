@@ -10,6 +10,7 @@ import {
   requestAction,
 } from "./pipeline.js";
 import { EXECUTORS } from "./executors/index.js";
+import { handleModelCall } from "./modelcall.js";
 
 const app = express();
 app.use(express.json({ limit: "10mb" }));
@@ -73,6 +74,45 @@ app.post("/approvals/:id/approve", async (req, res) => {
     }
     const row = await approveAction(req.params.id, approvedBy, payloadHash, payload, CONFIG);
     res.json({ action: row });
+  } catch (err) {
+    handle(res, err);
+  }
+});
+
+app.post("/model_call", async (req, res) => {
+  try {
+    const result = await handleModelCall(req.body ?? {});
+    res.json(result);
+  } catch (err) {
+    handle(res, err);
+  }
+});
+
+// Read API for Tier 2/Tier 1 (they hold no DB credentials).
+app.get("/runs/:id", async (req, res) => {
+  try {
+    const run = await pool.query(
+      `SELECT r.*,
+              (COALESCE((SELECT SUM(cost_microdollars) FROM agent_calls WHERE run_id = r.id), 0)
+             + COALESCE((SELECT SUM(provider_cost_microdollars) FROM actions WHERE run_id = r.id), 0)
+              )::bigint AS spent_microdollars
+         FROM runs r WHERE r.id = $1`,
+      [req.params.id],
+    );
+    if (!run.rows[0]) {
+      res.status(404).json({ error: "run not found" });
+      return;
+    }
+    const tasks = await pool.query(
+      `SELECT id, task_type, status, output_ref, updated_at FROM tasks WHERE run_id = $1 ORDER BY task_type`,
+      [req.params.id],
+    );
+    const brand = run.rows[0].brand_document_id
+      ? await pool.query(`SELECT id, version_number, full_text FROM brand_document WHERE id = $1`, [
+          run.rows[0].brand_document_id,
+        ])
+      : null;
+    res.json({ run: run.rows[0], tasks: tasks.rows, brandDocument: brand?.rows[0] ?? null });
   } catch (err) {
     handle(res, err);
   }

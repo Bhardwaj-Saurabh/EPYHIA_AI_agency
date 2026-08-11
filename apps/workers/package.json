@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "dotenv": "^17.4.2",
     "express": "^4.21.0"
   }
 }
