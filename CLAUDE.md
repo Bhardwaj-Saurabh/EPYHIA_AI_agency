@@ -16,17 +16,28 @@ The design phase is complete; implementation has not started yet.
   reference product (Polsia). Explicitly not what's graded; background only.
 - [AGENTS.md](AGENTS.md) — ten numbered non-negotiables the build must honor.
 
-**Stack (decided, per DESIGN.md §13):** Node/TypeScript on three Fly.io apps
-(Tier 1 public gateway, Tier 2 agent workers, Tier 3 Action Gate); React 18 +
-Vite + Tailwind + shadcn/ui admin dashboard served as static assets by Tier 1;
-Neon Postgres + Cloudflare R2; Auth0; Stripe test mode; generated sites on
-Cloudflare Pages; GPT-5.6 Sol/Terra/Luna via Azure OpenAI (Microsoft Foundry),
-reached only through the gate's OpenAI-compatible `/model_call`. **No agent
-framework** — thin hand-rolled agent loops.
+**Stack (decided, per DESIGN.md §13):** Python 3.12 + FastAPI on three Fly.io
+apps as a uv workspace (`apps/gate` Tier 3, `apps/workers` Tier 2,
+`apps/gateway` Tier 1); React 18 + Vite + Tailwind + shadcn/ui admin dashboard
+(future `apps/dashboard`) served as static assets by Tier 1; Neon Postgres via
+psycopg 3 (raw SQL, no ORM) + Cloudflare R2; Auth0; Stripe test mode; generated
+sites on Cloudflare Pages (deployed by the gate shelling out to wrangler — the
+one Node dependency); GPT-5.6 Sol/Terra/Luna via Azure OpenAI (Microsoft
+Foundry), reached only through the gate's `/model_call`. **No agent framework**
+— thin hand-rolled agent loops.
 
-There is still no package manifest, so there are no build/lint/test commands to
-document yet. **When code lands, update this section** with the real commands
-(install, run, test, single-test invocation, lint) — don't leave it stale.
+## Commands
+
+- Install: `uv sync --all-packages` (backend), `npm install` (wrangler/prettier)
+- Run: `uv run python -m gate.main` / `-m workers.main` / `-m gateway.main`
+  (ports 8082 / 8081 / 8080; health at `/health/live`, `/health/ready`)
+- Migrations: `uv run python -m gate.migrate` (applies `db/migrations/*.sql`)
+- Tests: `uv run pytest` — they hit the real Neon dev DB via `.env`
+- One test: `uv run pytest apps/gate/tests/test_pipeline.py::test_approval_binding`
+- Lint/format: `uv run ruff check apps/` and `uv run ruff format apps/`
+- Demos (real side effects — Cloudflare deploy / Azure spend):
+  `uv run python -m gate.demo`, `uv run python -m workers.demo` (both services
+  must be running)
 
 ## Never publish or stage
 
@@ -64,8 +75,8 @@ Strategist, Web Builder, week-1 demo; then Marketer, Ops/checkout, eval.
 Agents:
 - `react-frontend-expert` — dashboard/UI work (React+Vite+shadcn, no Next.js,
   no shadcn MCP server).
-- `node-backend-expert` — tiers/gate/Stripe/Neon/Fly work, builds to
-  DESIGN.md's invariants.
+- `python-backend-expert` — tiers/gate/Stripe/Neon/Fly work (FastAPI, psycopg,
+  uv), builds to DESIGN.md's invariants.
 - `code-reviewer` — reviews changes against the project invariants (gate
   boundary, idempotency, webhook handling, integer money, hash-bound approvals).
 - `eval-engineer` — owns eval/rubric.json, eval/eval.py, PRODUCT_EVAL.md;

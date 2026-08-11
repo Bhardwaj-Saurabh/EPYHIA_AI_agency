@@ -5,16 +5,17 @@ the specs. Update when a milestone lands or a decision is made; keep it short.
 
 ## Where we are
 
-- **Phase:** Strategist milestone DONE (README.md §6, item 3). Next: the
-  Web Builder (generate the site from the approved brand doc, deploy through
-  the gate) — item 4. Brand approval flow (dashboard) becomes needed soon:
-  runs stop at AWAITING_BRAND_APPROVAL by design.
-- **How to run:** `npm install`, then `npm run dev:gate` / `dev:workers` /
-  `dev:gateway`. Health: `GET :8082|:8081|:8080/health/live` and `/health/ready`.
-  Migrations: `npx tsx src/migrate.ts` from apps/gate. Tests: `npx vitest run`
-  from root (pipeline tests hit the real Neon dev DB). Gate demo:
-  `npx tsx src/demo.ts` from apps/gate (gate must be running).
-  `npm run typecheck` must stay green.
+- **Phase:** backend ported to Python (user decision 2026-08-11); Strategist
+  milestone re-verified in Python. Next: the Web Builder (generate the site
+  from the approved brand doc, deploy through the gate) — item 4. Brand
+  approval flow (dashboard) becomes needed soon: runs stop at
+  AWAITING_BRAND_APPROVAL by design.
+- **How to run:** `uv sync --all-packages` + `npm install` (wrangler), then
+  `uv run python -m gate.main` / `-m workers.main` / `-m gateway.main`.
+  Health: `GET :8082|:8081|:8080/health/live` and `/health/ready`.
+  Migrations: `uv run python -m gate.migrate`. Tests: `uv run pytest` (hits
+  the real Neon dev DB). Lint: `uv run ruff check apps/`. Demos:
+  `uv run python -m gate.demo` / `-m workers.demo` (services must be running).
 
 ## Done
 
@@ -51,6 +52,13 @@ the specs. Update when a milestone lands or a decision is made; keep it short.
   BrightSide Party Rentals brief → run 202 → real Sol call → brand doc v1
   (5.8k chars, grounded, no invented facts) + 4 tasks BLOCKED_ON_BRAND_APPROVAL
   → spent $0.056 of $2.00 budget → replay returned same run, no second call.
+- 2026-08-11 — **Backend ported TypeScript → Python** (user decision; DESIGN.md
+  amended first). uv workspace, FastAPI + psycopg + httpx; same pipeline, same
+  DB, same endpoints. Canonical payload hashing is byte-compatible: the Python
+  gate replayed TS-era audit rows (same idempotency keys recognized, 409 on
+  changed payloads), all 7 invariant tests re-pass via pytest, ruff clean, and
+  a fresh Luna call through the Python gate hit Azure for real (11 µ$ logged).
+  Wrangler remains the one Node dependency (gate shells out for Pages deploys).
 
 ## Blocked / owed decisions
 
