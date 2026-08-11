@@ -21,7 +21,7 @@ flowchart TD
     StripeWH["Stripe webhooks<br/>(checkout.session.completed / expired)"]
 
     subgraph T1["Tier 1 - Public web app (Fly.io, public ingress, no credentials)"]
-        API["Node API Gateway<br/>Auth0 login · admin dashboard · checkout API · webhook intake"]
+        API["Python API Gateway<br/>Auth0 login · admin dashboard · checkout API · webhook intake"]
     end
 
     subgraph T2["Tier 2 - Agent workers (private, scoped capabilities, no credentials)"]
@@ -79,7 +79,7 @@ flowchart TD
     Gate --> R2
 ```
 
-**Tier 1** is the public web app: a Node API Gateway on Fly.io handling Auth0 login, the admin dashboard, the customer checkout API, and Stripe webhook intake. It is reachable from the internet and holds no credentials.
+**Tier 1** is the public web app: a Python (FastAPI) API Gateway on Fly.io handling Auth0 login, the admin dashboard, the customer checkout API, and Stripe webhook intake. It is reachable from the internet and holds no credentials.
 
 **Tier 2** holds the agent workers: the Orchestration Runtime plus Strategist, Web Builder, Marketer, and Ops. Tier 2 is reachable only from Tier 1, receives scoped capability handles, has no public ingress, and holds no credentials — not even DB credentials. Agents are independently scalable.
 
@@ -237,9 +237,9 @@ Entries 1–5 and 8 are grounded in documented failures of Polsia, the real prod
 
 ## 13. Tech stack
 
-Marketing sites: Cloudflare Pages. Backend: Node API Gateway plus Node backend workers on Fly.io. Storage: Neon (Postgres) and Cloudflare R2. Auth: Auth0. Models: GPT-5.6 Sol / Terra / Luna served by Azure OpenAI (Microsoft Foundry), through the gate's /model_call. Video: Veo via kdowswell/veo-tools.
+Marketing sites: Cloudflare Pages. Backend: Python (FastAPI) API Gateway plus Python backend workers on Fly.io. Storage: Neon (Postgres) and Cloudflare R2. Auth: Auth0. Models: GPT-5.6 Sol / Terra / Luna served by Azure OpenAI (Microsoft Foundry), through the gate's /model_call. Video: Veo via kdowswell/veo-tools. Admin dashboard frontend: React + Vite, served as static assets by the Tier 1 gateway.
 
-No agent framework. The gate's /model_call implements the OpenAI-compatible API, and Tier 2 agents use the plain OpenAI SDK with its base URL pointed at the gate — the agent loops are hand-rolled hub-and-spoke. A framework's provider abstractions are exactly the thing the gate centralizes; keeping the loop thin makes a direct provider call structurally impossible rather than merely forbidden.
+No agent framework. The gate's /model_call speaks the OpenAI chat-completions shape, and Tier 2 agents reach it through a thin HTTP client — the agent loops are hand-rolled hub-and-spoke. A framework's provider abstractions are exactly the thing the gate centralizes; keeping the loop thin makes a direct provider call structurally impossible rather than merely forbidden.
 
 This footprint is a deliberate tradeoff. Three Fly.io apps plus Cloudflare Pages, Neon, R2, Auth0, and Veo is a lot of surface for a two-week solo build, and it puts pressure on running from a clean clone. The isolation is worth it: the credential boundary is the core of the system, and with this shape a compromised or misprompted agent cannot reach a provider even in principle — the keys are in a process it cannot dial. The mitigation is operational, not architectural: one bootstrap script provisions and deploys all three apps from `.env.example`, so a clean clone still comes up with a single command.
 
