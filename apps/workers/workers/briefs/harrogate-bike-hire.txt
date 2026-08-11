@@ -1,0 +1,23 @@
+Business: Dales Wheels - a small bike hire shop in Harrogate, UK, renting
+bikes by the day to visitors exploring the town and the Nidderdale cycle
+routes.
+
+Bikes (per-day rates, pay in full at booking):
+- City bike (comfortable, step-through): GBP 15/day, 10 available
+- Hybrid bike (towpaths and light trails): GBP 20/day, 8 available
+- E-bike (assisted, great for the hills): GBP 35/day, 6 available
+- Kids bike (ages 6-12, helmet included): GBP 10/day, 5 available
+
+How it works: customers book online and pay in full at booking. Collection
+and return at the shop - we don't deliver bikes. Every hire includes a
+helmet, a lock, and a puncture kit; riders bring their own pedals only if
+they prefer clipless.
+
+Customers: visitors and locals within easy reach of Harrogate town centre
+who want a well-kept bike for a day out rather than buying one.
+
+Contact: hello@daleswheels.example, +44 1423 111222,
+Dales Wheels, Station Parade, Harrogate HG1.
+
+Tone wishes: friendly, practical, a bit outdoorsy - people are planning a
+good day out. No invented reviews, awards, or guarantees.

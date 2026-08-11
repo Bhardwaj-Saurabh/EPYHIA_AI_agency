@@ -27,6 +27,17 @@ GATE = os.environ.get("GATE_URL", "http://localhost:8082").rstrip("/")
 SECRET = os.environ["STRIPE_WEBHOOK_SECRET"]
 
 SLUG = "biscuit-barn"
+BUSINESS_NAME = "The Biscuit Barn"
+OWNER_EMAIL = "owner@biscuitbarn.example"
+INTERACTIVE = False
+
+
+def pause(msg: str) -> None:
+    """--interactive: hold before each human approval so the dashboard's
+    pending state is visible on camera."""
+    if INTERACTIVE:
+        input(f"\n>>> {msg} - press Enter to approve... ")
+
 
 BRIEF = """Business: The Biscuit Barn - a small kennels and cattery in Harrogate, UK,
 boarding dogs and cats for owners who travel.
@@ -78,9 +89,9 @@ def main() -> None:
         "/tenants",
         method="POST",
         body={
-            "name": "Biscuit Barn Owner",
-            "email": "owner@biscuitbarn.example",
-            "businessName": "The Biscuit Barn",
+            "name": f"{BUSINESS_NAME} Owner",
+            "email": OWNER_EMAIL,
+            "businessName": BUSINESS_NAME,
             "businessSlug": SLUG,
         },
     )
@@ -97,7 +108,7 @@ def main() -> None:
             "brief": BRIEF,
             "budgetMicrodollars": 2_000_000,
             "approvedBy": "saurabh",
-            "idempotencyKey": f"biscuit-run-{tenant_id[:6]}",
+            "idempotencyKey": f"{SLUG}-run-{tenant_id[:6]}",
         },
     )
     run_id = submit["runId"]
@@ -117,6 +128,7 @@ def main() -> None:
     brand = state["brandDocument"]
     print(f"brand document v{brand['version_number']}: {len(brand['full_text'])} chars")
 
+    pause("brand document is ready (see the dashboard)")
     print("\n=== 3) admin approves the brand (hash-bound) ===")
     _, out = api(
         WORKERS,
@@ -130,7 +142,10 @@ def main() -> None:
     state = wait_for(run_id, "WEBSITE", {"AWAITING_DEPLOY_APPROVAL"})
     print(f"catalog: {[(c['name'], c['day_rate']) for c in state['catalog']]}")
 
-    print("\n=== 5) admin approves the exact reviewed site; go-live requires the synthetic purchase ===")
+    pause("deploy is pending approval (see the dashboard)")
+    print(
+        "\n=== 5) admin approves the exact reviewed site; go-live requires the synthetic purchase ==="
+    )
     website_task = next(t for t in state["tasks"] if t["task_type"] == "WEBSITE")
     site = json.loads(website_task["output_ref"])
     payload = {"projectName": site["projectName"], "files": site["files"]}
@@ -151,6 +166,7 @@ def main() -> None:
     state = wait_for(run_id, "MARKETING_PACK", {"AWAITING_PACK_APPROVAL"})
     _, pack = api(GATE, f"/marketing-pack/{run_id}")
     print(f"artifacts: {len(pack['artifacts'])}, eligible: {pack['approvalEligible']}")
+    pause("marketing pack awaits approval (see the dashboard)")
     _, out = api(
         GATE,
         f"/marketing-pack/{run_id}/approve",
@@ -160,7 +176,7 @@ def main() -> None:
     print(out)
 
     print("\n=== 7) a customer books via the public chain and pays ===")
-    cattery = next(c for c in state["catalog"] if "attery" in c["name"])
+    cattery = min(state["catalog"], key=lambda c: c["day_rate"])
     checkout_key = uuid.uuid4().hex
     body = {
         "businessSlug": SLUG,
@@ -205,7 +221,9 @@ def main() -> None:
     )
     print(f"webhook: {res.json()}")
     order = httpx.get(f"{GATEWAY}/api/reservations/{reservation_id}", timeout=30).json()["order"]
-    print(f"ORDER: {order['amount']}p {order['currency']} {order['status']} synthetic={order['is_synthetic']}")
+    print(
+        f"ORDER: {order['amount']}p {order['currency']} {order['status']} synthetic={order['is_synthetic']}"
+    )
 
     print("\n=== 8) re-run everything; nothing duplicates ===")
     _, replay = api(
@@ -217,7 +235,7 @@ def main() -> None:
             "brief": BRIEF,
             "budgetMicrodollars": 2_000_000,
             "approvedBy": "saurabh",
-            "idempotencyKey": f"biscuit-run-{tenant_id[:6]}",
+            "idempotencyKey": f"{SLUG}-run-{tenant_id[:6]}",
         },
     )
     print(f"run replayed: {replay['replayed']} (same: {replay['runId'] == run_id})")
@@ -232,9 +250,27 @@ def main() -> None:
     print(f"orders: real={len(orders['real'])} synthetic={len(orders['synthetic'])}")
 
     _, state = api(WORKERS, f"/runs/{run_id}")
-    print(f"\nrun spend: {state['run']['spent_microdollars']} of {state['run']['approved_budget_microdollars']} microdollars")
+    print(
+        f"\nrun spend: {state['run']['spent_microdollars']} of {state['run']['approved_budget_microdollars']} microdollars"
+    )
     print(f"live site: {live_url}")
 
 
 if __name__ == "__main__":
+    import argparse
+    from pathlib import Path
+
+    ap = argparse.ArgumentParser(description="EPYHIA full-pipeline demo")
+    ap.add_argument("--slug", default=SLUG)
+    ap.add_argument("--business", default=BUSINESS_NAME)
+    ap.add_argument("--email", default=OWNER_EMAIL)
+    ap.add_argument(
+        "--brief-file", help="path to a plain-text brief (default: the Biscuit Barn brief)"
+    )
+    ap.add_argument("--interactive", action="store_true", help="pause before each human approval")
+    args = ap.parse_args()
+    SLUG, BUSINESS_NAME, OWNER_EMAIL = args.slug, args.business, args.email
+    INTERACTIVE = args.interactive
+    if args.brief_file:
+        BRIEF = Path(args.brief_file).read_text()
     main()
