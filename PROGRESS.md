@@ -131,6 +131,22 @@ the specs. Update when a milestone lands or a decision is made; keep it short.
   demo_full.py = the 60-90s submission demo script. Also: gate POST /tenants;
   deterministic checks now carry only universal fabrication tripwires
   (brief-specific claims are the LLM reviewer's job — it has the brief).
+- 2026-08-11 — **Site design upgrade** (user request: dynamic colours,
+  professional standout look): the Web Builder's generation prompt gained an
+  ART DIRECTION section (brand-derived CSS design system with color-mix()
+  tints + clamp() fluid type, gradient hero with decorative inline SVG,
+  sticky blur nav, card hover-lift catalog, tinted section rhythm,
+  IntersectionObserver scroll reveals gated behind prefers-reduced-motion,
+  AA contrast + focus-visible) and the Terra reviewer now names "visually
+  flat / default-looking" as a rejectable violation. Biscuit Barn rebuilt
+  through the normal loop and redeployed (new version = new hash-bound
+  approval; go-live re-verified by 200 + its own synthetic purchase — orders
+  now real=1, synthetic=2, still no duplicates). All 15 live-HTML checks
+  pass (design features + booking contract + exact prices). Lesson: round 1
+  came back with no booking form — GPT-5.6 reasoning tokens share max_tokens
+  with the HTML and the longer styled page truncated — so the Sol cap went
+  20k → 28k. Run spend: $1.95 of $2.00 (budget nearly exhausted; future
+  design tweaks should go in a fresh run with its own budget).
 
 ## Blocked / owed decisions
 

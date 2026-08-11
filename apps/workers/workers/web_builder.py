@@ -24,7 +24,8 @@ MAX_ROUNDS = 3
 
 GENERATE_PROMPT = """You are the Web Builder of EPYHIA. Build a single-page,
 high-converting landing page for a local booking-based business - NOT a
-generic corporate template.
+generic corporate template. The page must look like a real design studio made
+it: a customer landing on it should immediately trust this business.
 
 Structure (in this order): a headline that says what the business does for
 whom; one supporting sentence; the full catalog with exact prices as a clear,
@@ -33,6 +34,34 @@ stated exactly as the brief states it (payment terms, what happens after
 booking); an accordion-style FAQ answering the practical customer questions
 this specific business raises (availability, what to bring/expect, payment,
 location and area - grounded in the brief); contact details.
+
+ART DIRECTION (all of it, still in one inline <style> block):
+- Design system first: define CSS custom properties on :root derived from the
+  brand palette - --primary, --accent, plus 2-3 computed tints/shades of them
+  (color-mix() is fine), --ink for text, --surface levels, a consistent
+  spacing scale and a fluid type scale using clamp() so headlines feel large
+  on desktop and right on mobile.
+- Hero with real presence: a layered background built from the brand colours
+  (e.g. a soft diagonal or radial gradient between --primary and --accent
+  tints, optionally with one or two large decorative inline-SVG blobs/shapes
+  at low opacity), a display-size headline, the supporting sentence, and a
+  high-contrast CTA button that smooth-scrolls to the booking form.
+- Sticky top nav: business name as a wordmark, 3-4 anchor links, background
+  with backdrop-filter blur once scrolled.
+- Catalog as cards: rounded corners, soft layered box-shadow, a clear price
+  tag styled as the strongest element of the card, and a hover state that
+  lifts the card (transform + shadow transition). Give each card a thin
+  accent-coloured top border or icon-sized inline SVG so the grid has rhythm.
+- Section rhythm: alternate plain and softly brand-tinted section backgrounds
+  (very low-saturation tints of the palette), generous vertical padding, and
+  section headings with a small accent detail (gradient text, underline bar,
+  or eyebrow label) so the page never reads as one flat column.
+- Motion, tastefully: reveal sections on scroll with a tiny translate+fade via
+  IntersectionObserver; animate the accordion open/close; give buttons and
+  links transition on hover/focus. Wrap ALL motion in
+  @media (prefers-reduced-motion: no-preference).
+- Accessibility is part of the polish: WCAG AA contrast on all text over
+  gradients/tints, visible :focus-visible rings, semantic landmarks.
 
 BOOKING FORM CONTRACT (follow exactly - the backend depends on it):
 - <form id="booking-form"> containing: a quantity input per catalog item
@@ -72,9 +101,11 @@ actually renders on mobile and desktop: hierarchy, spacing, readability.
 
 Approve when the page is clearly good enough to represent a real local
 business: on-brand palette and voice, a scannable catalog with prices, warm
-practical copy, and a sensible mobile layout. Reject ONLY for concrete
-violations you can name - a specific brand-document conflict, unreadable
-hierarchy, a generic corporate/AI-template feel, or broken layout. Do not
+practical copy, and a sensible mobile layout with visible design intent
+(deliberate colour system, hierarchy, spacing - not default browser styling).
+Reject ONLY for concrete violations you can name - a specific brand-document
+conflict, unreadable hierarchy, a visually flat or default-looking page, a
+generic corporate/AI-template feel, or broken layout. Do not
 reject for taste-level nitpicks or hypothetical improvements a reasonable
 customer would never notice. If you reject, list at most 5 specific fixes.
 
@@ -145,7 +176,10 @@ def build_website(tenant_id: str, run_id: str) -> dict[str, Any]:
             agent_name="web_builder",
             tier="sol",
             json_mode=True,
-            max_tokens=20000,
+            # Reasoning tokens share this cap with the HTML itself; the art
+            # direction makes pages longer, and a truncated page loses its
+            # booking form (= a wasted Sol round).
+            max_tokens=28000,
             messages=[
                 {"role": "system", "content": GENERATE_PROMPT},
                 {"role": "user", "content": user},
@@ -154,7 +188,9 @@ def build_website(tenant_id: str, run_id: str) -> dict[str, Any]:
         files = json.loads(result["content"])["files"]
         html = files["index.html"]
 
-        problems = check_site(html, catalog, tenant.get("business_email"), require_booking_form=True)
+        problems = check_site(
+            html, catalog, tenant.get("business_email"), require_booking_form=True
+        )
         if problems:
             feedback = "Deterministic checks failed:\n" + "\n".join(f"- {p}" for p in problems)
             log.info("round %d: %d deterministic problems: %s", rounds, len(problems), problems)
@@ -202,7 +238,12 @@ def build_website(tenant_id: str, run_id: str) -> dict[str, Any]:
         run_id=run_id,
         agent_name="web_builder",
         action_type="site_storage",
-        payload={"runId": run_id, "files": files, "reviewRounds": rounds, "projectName": project_name},
+        payload={
+            "runId": run_id,
+            "files": files,
+            "reviewRounds": rounds,
+            "projectName": project_name,
+        },
         idempotency_key=f"site-{run_id}-{version}",
     )
 
