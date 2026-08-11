@@ -175,6 +175,40 @@ def main() -> None:
     )
     print(out)
 
+    print("\n=== 6b) launch video - deterministic render, approval-gated ===")
+    _, req = api(
+        WORKERS, f"/runs/{run_id}/render-videos", method="POST", body={"tenantId": tenant_id}
+    )
+    if req.get("status") == "pending_approval":
+        pause("video render awaits approval (exact storyboard, hash-bound)")
+        import re as _re
+
+        _, pk = api(GATE, f"/marketing-pack/{run_id}")
+        storyboard = next(
+            a["text_content"]
+            for a in pk["artifacts"]
+            if a["artifact_type"] == "VIDEO_STORYBOARD" and a["approved_by"]
+        )
+        payload = {
+            "runId": run_id,
+            "storyboard": storyboard,
+            "businessName": BUSINESS_NAME,
+            "brandColors": _re.findall(r"#[0-9A-Fa-f]{6}", state["brandDocument"]["full_text"])[:6],
+            "siteUrl": live_url,
+            "contactEmail": state["tenant"]["business_email"],
+        }
+        status, out = api(
+            GATE,
+            f"/approvals/{req['actionId']}/approve",
+            method="POST",
+            body={"approvedBy": "saurabh", "payloadHash": req["payloadHash"], "payload": payload},
+        )
+        if status != 200:
+            raise RuntimeError(f"video approve failed: {out}")
+        print(f"rendered + stored: {out['action']['provider_reference']}")
+    else:
+        print(f"video render: {req}")
+
     print("\n=== 7) a customer books via the public chain and pays ===")
     cattery = min(state["catalog"], key=lambda c: c["day_rate"])
     checkout_key = uuid.uuid4().hex
