@@ -10,8 +10,10 @@ The design phase is complete; implementation has not started yet.
   user's own system design (a party-rentals business run by a four-agent crew
   behind an Action Gate), committed as the repo's first commit per the
   assignment's hard gate. When DESIGN.md and this file disagree, DESIGN.md wins.
-- [README.md](README.md) — the course assignment (EPYHIA, Assignment 4 of an FDE
-  track), including the grading rubric and build order.
+- [docs/ASSIGNMENT.md](docs/ASSIGNMENT.md) — the course assignment (EPYHIA, Assignment 4 of an FDE
+  track), including the grading rubric and build order. README.md at the root
+  is the public-facing project overview (safe to edit); the assignment file is
+  hook-protected.
 - [README-sample.md](README-sample.md) — a longer "north star" teardown of the
   reference product (Polsia). Explicitly not what's graded; background only.
 - [AGENTS.md](AGENTS.md) — ten numbered non-negotiables the build must honor.
@@ -67,7 +69,7 @@ review findings, implementing to the spec, and small user-approved design edits
 architectural decisions, or rewriting DESIGN.md wholesale, is not. When the spec
 is ambiguous, ask — don't decide. Never amend or rewrite the root commit.
 
-Implementation follows the build order in README.md §6: Action Gate first, then
+Implementation follows the build order in docs/ASSIGNMENT.md §6: Action Gate first, then
 Strategist, Web Builder, week-1 demo; then Marketer, Ops/checkout, eval.
 
 ## Claude Code harness (.claude/)
@@ -83,7 +85,7 @@ Agents:
   turns rubric rows and observed failures into automated checks.
 
 Commands:
-- `/track` — where the build stands vs README §6's order; flags drift; updates
+- `/track` — where the build stands vs ASSIGNMENT §6's order; flags drift; updates
   PROGRESS.md.
 - `/eval` — one turn of the eval-driven development loop: run evals, diff
   results, recommend the single highest-value fix.
@@ -99,18 +101,18 @@ This root CLAUDE.md is the **only** CLAUDE.md — don't create per-folder ones.
 ## Working method
 
 - **Eval-driven development** (docs/eval-driven-development.png): evals come
-  early, not last. The README §7 rubric is the business metric; `eval/` is the
+  early, not last. The ASSIGNMENT §7 rubric is the business metric; `eval/` is the
   measurement; improvements are chosen by what moves failing checks. When a
   new failure mode appears, a check for it is added.
 - **Session start:** read PROGRESS.md first — it is the one-page state of the
   build. Trust it unless the repo contradicts it; update it when milestones
   land.
 - **Token discipline:** never read README-sample.md (80KB) unless a specific
-  section is needed — everything operative is in DESIGN.md, README.md §6–7,
+  section is needed — everything operative is in DESIGN.md, docs/ASSIGNMENT.md §6–7,
   and PROGRESS.md. Prefer Explore agents for broad searches; read files
   surgically once code exists.
 
-## Architecture the eventual system must have (per README.md)
+## Architecture the eventual system must have (per docs/ASSIGNMENT.md)
 
 Whatever stack is chosen, the graded shape is fixed:
 
@@ -140,7 +142,7 @@ Whatever stack is chosen, the graded shape is fixed:
 
 ## Grading shape (for prioritization, not a checklist to game)
 
-Per README.md §7: real deliverables (30 pts) and the Action Gate (20 pts) carry
+Per docs/ASSIGNMENT.md §7: real deliverables (30 pts) and the Action Gate (20 pts) carry
 the most weight, followed by crew/orchestration and "not slop" (15 pts each), then
 design/failure-catalogue and clean-clone runnability (10 pts each). The two rows
 called out as decisive: the checkout **actually persists an order**, and a

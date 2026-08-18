@@ -1,5 +1,5 @@
 {
-  "source": "README.md section 7 - Grading (100 pts)",
+  "source": "docs/ASSIGNMENT.md section 7 - Grading (100 pts)",
   "target": "the running epyhia agency (local or deployed) and its Neon database",
   "criteria": [
     {

@@ -1,4 +1,4 @@
-"""EPYHIA eval suite (README.md sec. 7, DESIGN.md sec. 14).
+"""EPYHIA eval suite (docs/ASSIGNMENT.md sec. 7, DESIGN.md sec. 14).
 
 Runs every rubric check against the RUNNING agency and its real database, and
 writes PRODUCT_EVAL.md - the submission artifact. Evidence over claims: checks

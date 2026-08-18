@@ -9,7 +9,7 @@ file_path=$(echo "$input" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
 base=$(basename "$file_path")
 
 case "$base" in
-  README.md|README-sample.md|AGENTS.md)
+  docs/ASSIGNMENT.md|README-sample.md|AGENTS.md)
     # Only protect the course files at the repo root, not app-level readmes.
     dir=$(cd "$(dirname "$file_path")" 2>/dev/null && pwd)
     if [ "$dir" = "$CLAUDE_PROJECT_DIR" ]; then
