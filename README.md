@@ -1,5 +1,13 @@
 # EPYHIA — a one-person AI agency
 
+[![CI/CD](https://github.com/Bhardwaj-Saurabh/EPYHIA_AI_agency/actions/workflows/deploy.yml/badge.svg)](https://github.com/Bhardwaj-Saurabh/EPYHIA_AI_agency/actions/workflows/deploy.yml)
+[![Eval](https://img.shields.io/badge/product_eval-100%2F100-brightgreen)](PRODUCT_EVAL.md)
+[![Deployed on Fly.io](https://img.shields.io/badge/deployed-Fly.io-8b5cf6)](https://epyhia-gateway.fly.dev)
+[![Python 3.12](https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white)](pyproject.toml)
+[![React 18](https://img.shields.io/badge/react-18-61DAFB?logo=react&logoColor=black)](apps/dashboard)
+[![Stripe test mode](https://img.shields.io/badge/stripe-test_mode_only-635BFF?logo=stripe&logoColor=white)](DESIGN.md)
+[![Design-first](https://img.shields.io/badge/root_commit-DESIGN.md-blueviolet)](DESIGN.md)
+
 ![EPYHIA architecture overview](docs/EPYHIA.png)
 
 **A business brief goes in. A real business comes out:** a live website on a real
