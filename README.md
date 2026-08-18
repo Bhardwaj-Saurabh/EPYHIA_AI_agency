@@ -26,24 +26,43 @@ can spend money and publish to the world, but only through one audited door.
 
 ---
 
-## Why
+## The problem
 
-This is the capstone of a Forward Deployed Engineer track ([full assignment](docs/ASSIGNMENT.md)),
-modeled on a real product category: autonomous "AI business builders." The
-reference product's most-reported failures are instructive — tasks marked
-"complete" that never deployed, outreach with wrong prices, duplicate charges,
-and launched businesses that turned out to be cosmetic landing pages with no
-way to buy anything.
+A small business owner — a kennel, a bike shop, a bakery — needs three things
+to start taking money: a website, marketing that doesn't misrepresent them, and
+a way to get paid. Today that means either thousands of pounds and weeks with
+an agency, or stitching together site builders, copy tools, and payment
+providers themselves. The demand is real, the work is formulaic — which is
+exactly why a wave of autonomous "AI business builder" products has appeared to
+sell it as a service.
 
-**The moment an agent can ship and charge, "it looked fine in the demo" stops
-being good enough.** EPYHIA is an answer to that: an agent system designed
-around the assumption that agents lie, crash, and hallucinate — where every
-claim is verified against reality and every irreversible action passes a human.
-The full failure catalogue and its controls are in [DESIGN.md §12](DESIGN.md#12-failure-catalogue).
+## Why the existing products fail
 
-## What
+I studied the most prominent of them before designing anything, and its public
+track record is the actual problem statement. Customers reported: tasks marked
+**"complete" that never deployed**; outreach sent with **wrong names and wrong
+prices**; **duplicate charges** on retries; and "launched" businesses that were
+**cosmetic landing pages with no working way to buy anything** — while the
+dashboard counted them as live. Its own founder admitted losing money on every
+customer from uncontrolled model spend.
 
-Four agents behind a single **Action Gate** (three-tier isolation, all on Fly.io):
+The diagnosis: none of these are generation failures — today's models write
+good copy and good pages. They are **governance failures**. The systems let
+agents spend money and publish to the world on their own say-so, trusted their
+self-reports as status, and had no idempotency around retries. The moment an
+agent can ship and charge, "it looked fine in the demo" stops being good
+enough.
+
+## The solution
+
+EPYHIA is a one-person AI agency built on the opposite assumption: **agents
+lie, crash, and hallucinate — so verify everything against reality, and put
+one audited, human-controlled door in front of anything irreversible.** The
+generation is the easy half; the product is the trust layer around it. The
+full failure catalogue and the control that answers each entry is in
+[DESIGN.md §12](DESIGN.md#12-failure-catalogue).
+
+Four specialist agents behind a single **Action Gate** (three-tier isolation, all on Fly.io):
 
 | Agent | Model tier | Job | May never |
 |---|---|---|---|
@@ -131,7 +150,7 @@ agent's self-report. The full data model, flows, idempotency scheme, and
 failure catalogue are in [DESIGN.md](DESIGN.md) — written and committed
 **before any code**, as the root commit proves (`git log --reverse`).
 
-## How it works (one run)
+## How a business gets built (one engagement)
 
 1. **Brief in** — the administrator submits a plain-language brief with a spend
    budget (e.g. $2.00). A deterministic run-shell is created; replaying the
@@ -164,8 +183,17 @@ failure catalogue are in [DESIGN.md](DESIGN.md) — written and committed
    second charge. Crash-and-retry is safe by construction (deterministic
    reservation ids, version-scoped deploy keys, unique constraints).
 
-A full run costs about **$0.80–$1.40** in model spend, itemized per call by
-agent, tier, and tokens — visible on the [dashboard](https://epyhia-gateway.fly.dev).
+## The unit economics
+
+The reference product lost money per customer because every task ran on the
+most expensive model with no ceiling. EPYHIA treats model spend as a business
+input: the administrator approves a **budget per engagement** up front (the
+gate refuses calls beyond it), the top-tier model is used only where reasoning
+pays (strategy, site generation), and cheaper tiers draft, review, extract,
+and judge. A complete business — brand, site, marketing pack, launch video,
+working checkout — costs **$0.80–$1.40 of model spend**, itemized per call by
+agent, tier, and tokens on the [dashboard](https://epyhia-gateway.fly.dev).
+Selling that for even £50 is a real margin; that arithmetic is the business.
 
 ## Proof over promises
 
@@ -233,22 +261,28 @@ eval/                rubric.json + eval.py → PRODUCT_EVAL.md
 fly/                 per-app Fly.io configs; .github/workflows/ is the CI/CD pipeline
 ```
 
-## What this project demonstrates
+## How I think about systems like this
 
-- **Agent systems that survive contact with money**: single credential holder,
-  human-approved irreversibles, per-run budgets, integer money, test-mode
-  enforced at the key level
-- **Idempotency as a design principle** (crash + re-run → one site, one order),
-  proven by automated checks, not asserted
-- **Verification against reality**: deploys confirmed by HTTP + a synthetic
-  purchase through the real payment path; the eval reads databases and live
-  URLs, never agent self-reports
-- **Cost-engineered LLM usage**: top-tier model only where reasoning pays,
-  cheap tiers for drafting/review/judging, every call metered
-- **Eval-driven development**: the rubric became an executable test suite;
-  observed failures (reviewer context asymmetry, inclusive billing, webhook
-  replay) became permanent regression checks
+The principles I designed to — each one traceable to a documented failure of
+the products this competes with:
+
+- **Agents that touch money need governance, not vibes**: a single credential
+  holder, human approval before anything irreversible, a spend ceiling per
+  engagement, integer money, and test-mode enforced at the key level
+- **Idempotency is a product feature** — a crash or retry yields one site and
+  one charge, never two — and it's proven by automated checks, not asserted
+- **Never trust a self-report**: a deploy counts as live only after the URL
+  answers *and* a synthetic purchase persists through the real payment path;
+  the evaluation reads databases and live URLs, never an agent's status field
+- **Cost is an engineering dimension**: the expensive model only where
+  reasoning pays; every call metered and attributable
+- **Measure yourself before anyone else does**: the quality bar became an
+  executable eval suite, and every failure observed during development
+  (reviewer context asymmetry, inclusive billing, webhook replay) became a
+  permanent regression check
 
 Built by **Saurabh Bhardwaj** as a design-first solo project: the architecture
-in [DESIGN.md](DESIGN.md) came before any code, and every architectural
-decision since originated with its author.
+in [DESIGN.md](DESIGN.md) was written and committed before any code, and every
+architectural decision since originated with its author. The project was built
+against the brief and grading rubric in [docs/ASSIGNMENT.md](docs/ASSIGNMENT.md);
+the problem, the diagnosis, and the design are the real product.
