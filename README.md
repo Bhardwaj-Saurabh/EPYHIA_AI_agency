@@ -63,9 +63,73 @@ capability check → human approval (if irreversible) → run budget
 
 Network topology enforces the design: only Tier 1 has a public address —
 Tier 2 (agents) and Tier 3 (gate) have **no public inbound at all** (Fly
-private networking). The full architecture, data model, flows and idempotency
-scheme are in [DESIGN.md](DESIGN.md) — written and committed **before any
-code**, as the repo's root commit proves (`git log --reverse`).
+private networking).
+
+### Architecture (from [DESIGN.md](DESIGN.md), the repo's root commit)
+
+```mermaid
+flowchart TD
+    Admin["Administrator<br/>(brief, reviews, approvals)"]
+    Customer["Customer<br/>(generated site on Cloudflare Pages)"]
+    StripeWH["Stripe webhooks"]
+
+    subgraph T1["Tier 1 - Public web app (Fly.io, public ingress, no credentials)"]
+        API["API Gateway<br/>admin dashboard · checkout API · webhook intake"]
+    end
+
+    subgraph T2["Tier 2 - Agent workers (private, scoped capabilities, no credentials)"]
+        Runtime["Orchestration Runtime"]
+        Strategist["Strategist<br/>(Sol 5.6)"]
+        WebBuilder["Web Builder<br/>(Sol 5.6)"]
+        Marketer["Marketer<br/>(Terra 5.6)"]
+        Ops["Ops<br/>(Luna 5.6)"]
+    end
+
+    subgraph T3["Tier 3 - Action Gate (private, no public inbound, sole credential holder)"]
+        Gate["capability check → approval check → run budget<br/>→ idempotency → audit + cost log<br/>/model_call · /deploy · /checkout-session · /video-render · /publish"]
+    end
+
+    subgraph EXT["External providers"]
+        OpenAI["Azure OpenAI"]
+        CF["Cloudflare Pages"]
+        Stripe["Stripe (test mode)"]
+        Neon["Neon DB"]
+        R2["R2"]
+    end
+
+    Admin -->|brief + approvals| API
+    Customer -->|checkout request| API
+    StripeWH -->|"signed event (raw body forwarded unchanged)"| API
+
+    API --> Runtime
+    Strategist -->|delegates| WebBuilder
+    Strategist -->|delegates| Marketer
+    Strategist -->|delegates| Ops
+    Strategist --- Runtime
+    WebBuilder --- Runtime
+    Marketer --- Runtime
+    Ops --- Runtime
+    Runtime -->|"/model_call for scoped agent"| Gate
+
+    WebBuilder -->|"/deploy (admin-approved)"| Gate
+    Marketer -->|"/video-render (admin-approved)"| Gate
+    Ops -->|"/checkout-session · storage"| Gate
+
+    CF -.->|"evidence: verified URL + HTTP 200"| Gate
+    Neon -.->|"evidence: persisted order row"| Gate
+
+    Gate --> OpenAI
+    Gate --> CF
+    Gate --> Stripe
+    Gate --> Neon
+    Gate --> R2
+```
+
+The dashed edges are the point: the gate collects **evidence from reality**
+(a URL answering 200, an order row actually persisted) instead of trusting an
+agent's self-report. The full data model, flows, idempotency scheme, and
+failure catalogue are in [DESIGN.md](DESIGN.md) — written and committed
+**before any code**, as the root commit proves (`git log --reverse`).
 
 ## How it works (one run)
 
